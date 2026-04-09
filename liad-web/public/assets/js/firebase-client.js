@@ -6,6 +6,7 @@ import {
   setPersistence
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 import { getFirestore } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import { getStorage } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-storage.js";
 
 let servicesPromise;
 
@@ -42,13 +43,14 @@ export async function getFirebaseServices() {
       const app = initializeApp(config);
       const auth = getAuth(app);
       const db = getFirestore(app);
+      const storage = getStorage(app);
       const googleProvider = new GoogleAuthProvider();
 
       googleProvider.setCustomParameters({
         prompt: "select_account"
       });
 
-      return { app, auth, db, googleProvider };
+      return { app, auth, db, storage, googleProvider };
     });
   }
 

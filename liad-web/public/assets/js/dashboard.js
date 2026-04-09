@@ -1988,9 +1988,6 @@ async function saveLogoSection() {
     const persisted = await saveStoreLogo(state.currentUser, {
       accountId: state.accountId,
       file: state.settings.logoSection.pendingFile,
-      inlineDataUrl: state.settings.logoSection.draftIsGenerated
-        ? ""
-        : state.settings.logoSection.draftLogoUrl,
       previousLogoStoragePath: state.settings.logoSection.savedIsGenerated
         ? ""
         : state.settings.logoSection.savedLogoStoragePath

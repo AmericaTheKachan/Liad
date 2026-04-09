@@ -8,6 +8,12 @@ import {
   serverTimestamp,
   writeBatch
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
+import {
+  deleteObject,
+  getDownloadURL,
+  ref,
+  uploadBytes
+} from "https://www.gstatic.com/firebasejs/12.7.0/firebase-storage.js";
 import { getFirebaseServices } from "./firebase-client.js";
 import {
   formatCnpj,
@@ -162,6 +168,39 @@ function buildAccountRefs(db, user, accountId) {
   };
 }
 
+function sanitizeStorageFileName(fileName) {
+  const trimmed = String(fileName ?? "").trim().toLowerCase();
+  const normalized = trimmed
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+
+  return normalized || "logo";
+}
+
+function buildLogoStoragePath(accountId, file) {
+  const safeFileName = sanitizeStorageFileName(file?.name);
+  return `accounts/${accountId}/store-logo/${Date.now()}-${safeFileName}`;
+}
+
+async function deleteLogoIfExists(storage, storagePath) {
+  if (!storagePath) {
+    return;
+  }
+
+  try {
+    await deleteObject(ref(storage, storagePath));
+  } catch (error) {
+    if (error?.code === "storage/object-not-found") {
+      return;
+    }
+
+    throw error;
+  }
+}
+
 async function commitProfilePatch(user, accountId, accountPatch, userPatch, authPatch) {
   const { db } = await getFirebaseServices();
   const { accountDocRef, userDocRef } = buildAccountRefs(db, user, accountId);
@@ -250,16 +289,32 @@ export async function updateStoreProfile(user, payload) {
 }
 
 export async function saveStoreLogo(user, payload) {
-  const { db } = await getFirebaseServices();
+  const { db, storage } = await getFirebaseServices();
   const { accountDocRef, userDocRef } = buildAccountRefs(db, user, payload.accountId);
   let logoUrl = "";
   let logoStoragePath = "";
   let hasCustomLogo = false;
+  let uploadedLogoStoragePath = "";
 
   if (payload.file) {
-    logoUrl = payload.inlineDataUrl ?? "";
-    logoStoragePath = "";
-    hasCustomLogo = true;
+    uploadedLogoStoragePath = buildLogoStoragePath(payload.accountId, payload.file);
+
+    try {
+      const uploadResult = await uploadBytes(ref(storage, uploadedLogoStoragePath), payload.file, {
+        contentType: payload.file.type || undefined,
+        cacheControl: "public,max-age=3600"
+      });
+
+      logoUrl = await getDownloadURL(uploadResult.ref);
+      logoStoragePath = uploadedLogoStoragePath;
+      hasCustomLogo = true;
+    } catch (error) {
+      if (error?.code?.startsWith?.("storage/")) {
+        throw new Error("Nao foi possivel enviar a logo para o Firebase Storage.");
+      }
+
+      throw error;
+    }
   }
 
   const batch = writeBatch(db);
@@ -288,6 +343,14 @@ export async function saveStoreLogo(user, payload) {
   try {
     await batch.commit();
   } catch (error) {
+    if (uploadedLogoStoragePath) {
+      try {
+        await deleteLogoIfExists(storage, uploadedLogoStoragePath);
+      } catch (cleanupError) {
+        console.error("Falha ao limpar a logo enviada apos erro no Firestore.", cleanupError);
+      }
+    }
+
     if (isPermissionDeniedError(error)) {
       throw new Error(
         "O Firestore bloqueou o salvamento da logo. Revise as regras das colecoes accounts e users."
@@ -295,6 +358,14 @@ export async function saveStoreLogo(user, payload) {
     }
 
     throw error;
+  }
+
+  if (payload.previousLogoStoragePath && payload.previousLogoStoragePath !== logoStoragePath) {
+    try {
+      await deleteLogoIfExists(storage, payload.previousLogoStoragePath);
+    } catch (error) {
+      console.error("Falha ao remover a logo anterior do Firebase Storage.", error);
+    }
   }
 
   return {

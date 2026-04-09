@@ -89,6 +89,50 @@ service cloud.firestore {
 }
 ```
 
+## Regras recomendadas do Firebase Storage
+
+O upload da logo da loja usa o caminho:
+
+- `accounts/{accountId}/store-logo/{timestamp}-{fileName}`
+
+Como o app salva o `accountId` no documento `users/{uid}`, a regra abaixo permite que o usuario autenticado leia e altere apenas os arquivos da propria conta:
+
+```js
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function accountIdFromUserProfile() {
+      return firestore.get(
+        /databases/(default)/documents/users/$(request.auth.uid)
+      ).data.accountId;
+    }
+
+    function belongsToAccount(accountId) {
+      return isSignedIn() && accountIdFromUserProfile() == accountId;
+    }
+
+    match /accounts/{accountId}/store-logo/{fileName} {
+      allow read: if belongsToAccount(accountId);
+
+      allow create, update: if belongsToAccount(accountId)
+        && request.resource.size <= 2 * 1024 * 1024
+        && request.resource.contentType.matches('image/(jpeg|png|svg\\+xml)');
+
+      allow delete: if belongsToAccount(accountId);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
+```
+
 ## Fluxos implementados
 
 - `/login`: login com Google ou email e senha
