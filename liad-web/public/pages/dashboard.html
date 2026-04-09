@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Painel do Lojista | LIAD</title>
+    <meta
+      name="description"
+      content="Painel interno do lojista da LIAD com visao geral, metricas detalhadas e gerenciamento da API."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/css/global.css" />
+    <script src="/assets/js/tailwind-config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="/assets/js/dashboard.js"></script>
+  </head>
+  <body class="bg-liad-bg font-body text-liad-text antialiased selection:bg-liad-purple/30">
+    <div class="liad-bg-hero relative h-screen overflow-hidden">
+      <div class="liad-bg-hero-glow pointer-events-none absolute inset-x-0 top-0 h-[920px]"></div>
+      <div class="liad-bg-page-flow pointer-events-none absolute inset-0 opacity-90"></div>
+
+      <div data-dashboard-shell class="relative z-10 flex h-screen overflow-hidden">
+        <div
+          data-mobile-overlay
+          hidden
+          class="fixed inset-0 z-30 bg-black/55 backdrop-blur-sm lg:hidden"
+        ></div>
+
+        <aside
+          data-sidebar
+          data-collapsed="false"
+          data-mobile-open="false"
+          class="fixed inset-y-0 left-0 z-40 flex w-[240px] shrink-0 -translate-x-full flex-col justify-between border-r border-white/10 bg-[rgba(19,19,21,0.94)] px-4 py-4 backdrop-blur-xl transition-all duration-200 ease-out lg:static lg:translate-x-0"
+        >
+          <div class="min-h-0">
+            <a
+              href="/dashboard"
+              data-brand-link
+              class="flex items-center gap-3 rounded-2xl px-2 py-2 text-transparent bg-gradient-to-r from-liad-purple to-liad-blue bg-clip-text"
+            >
+              <span data-brand-text class="font-display text-2xl font-extrabold tracking-[-0.06em]">
+                LIAD
+              </span>
+            </a>
+
+            <div class="mt-5 h-px bg-white/10"></div>
+
+            <nav class="mt-5 grid gap-2" aria-label="Navegacao principal">
+              <a href="/dashboard" data-nav-link data-route="/dashboard"></a>
+              <a href="/metricas" data-nav-link data-route="/metricas"></a>
+              <a href="/api" data-nav-link data-route="/api"></a>
+            </nav>
+          </div>
+
+          <div class="relative">
+            <button
+              type="button"
+              data-store-menu-trigger
+              aria-expanded="false"
+              class="flex w-full items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] px-3 py-3 text-left transition hover:border-white/20 hover:bg-white/[0.07]"
+            >
+              <span data-store-identity class="flex min-w-0 items-center gap-3">
+                <span
+                  data-store-icon
+                  class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-liad-purple to-liad-blue font-display text-sm font-extrabold text-black"
+                ></span>
+                <span data-store-copy class="min-w-0">
+                  <strong data-store-name class="block truncate text-sm font-semibold text-liad-text">
+                    Loja LIAD
+                  </strong>
+                </span>
+              </span>
+              <span data-store-gear class="text-liad-muted"></span>
+            </button>
+
+            <div
+              data-store-menu
+              hidden
+              class="absolute bottom-[calc(100%+10px)] left-0 right-0 rounded-2xl border border-white/10 bg-[rgba(19,19,21,0.98)] p-2 shadow-panel"
+            >
+              <button
+                type="button"
+                data-store-settings
+                class="w-full rounded-xl px-3 py-2.5 text-left text-sm text-liad-text transition hover:bg-white/[0.06]"
+              >
+                Configurações
+              </button>
+              <button
+                type="button"
+                data-logout
+                class="mt-1 w-full rounded-xl px-3 py-2.5 text-left text-sm text-liad-text transition hover:bg-white/[0.06]"
+              >
+                Desconectar
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <main class="relative z-10 flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header
+            class="flex h-16 shrink-0 items-center justify-between border-b border-white/10 bg-[rgba(19,19,21,0.82)] px-4 backdrop-blur-xl sm:px-6"
+          >
+            <div class="flex min-w-0 items-center gap-3">
+              <button
+                type="button"
+                data-sidebar-toggle
+                aria-label="Alternar menu lateral"
+                class="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] text-liad-text transition hover:-translate-y-0.5 hover:border-white/20 hover:bg-white/[0.08]"
+              ></button>
+              <div class="min-w-0">
+                <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">Painel</p>
+                <p data-breadcrumb class="truncate text-sm font-medium text-liad-text">Dashboard</p>
+              </div>
+            </div>
+          </header>
+
+          <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+            <div class="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
+              <div
+                data-banner
+                hidden
+                class="mb-4 rounded-2xl border border-[#ff8439]/40 bg-[#ff8439]/10 px-4 py-3 text-sm text-[#ffd5bd]"
+              ></div>
+              <section
+                data-view-root
+                class="transition-all duration-200 ease-out"
+                aria-live="polite"
+              ></section>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <div
+      data-settings-root
+      hidden
+      class="fixed inset-0 z-[70] overflow-hidden opacity-0 transition duration-200 ease-out"
+    >
+      <div
+        data-settings-overlay
+        class="absolute inset-0 bg-black/70 lg:bg-black/30 lg:backdrop-blur-sm"
+      ></div>
+      <div class="relative flex h-full items-stretch justify-center p-0 lg:p-6">
+        <section
+          data-settings-panel
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="settings-title"
+          tabindex="-1"
+          class="relative flex h-full w-full translate-y-6 flex-col overflow-hidden bg-[rgba(19,19,21,0.985)] transition duration-200 ease-out lg:h-[min(88vh,920px)] lg:max-h-[88vh] lg:max-w-[780px] lg:rounded-[32px] lg:border lg:border-white/10 lg:shadow-panel"
+        >
+          <div data-settings-content class="flex h-full flex-col"></div>
+        </section>
+      </div>
+    </div>
+
+    <div
+      data-toast-root
+      class="pointer-events-none fixed inset-x-4 bottom-4 z-[90] flex flex-col items-end gap-3 sm:inset-x-auto sm:right-4 sm:w-full sm:max-w-sm"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+
+    <div
+      data-modal-root
+      class="fixed inset-0 z-[80] hidden place-items-center p-4"
+    >
+      <div data-modal-close class="absolute inset-0 bg-black/65 backdrop-blur-sm"></div>
+      <div
+        data-modal-dialog
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modal-title"
+        class="relative z-10 w-full max-w-[460px] rounded-[32px] border border-white/10 bg-[rgba(19,19,21,0.98)] p-6 shadow-panel"
+      >
+        <p
+          data-modal-eyebrow
+          class="text-[11px] uppercase tracking-[0.22em] text-liad-muted"
+        >
+          Confirmacao
+        </p>
+        <h2
+          id="modal-title"
+          data-modal-title
+          class="mt-3 font-display text-3xl font-extrabold tracking-[-0.05em] text-liad-text"
+        ></h2>
+        <p data-modal-body class="mt-4 text-sm leading-7 text-liad-muted"></p>
+        <div class="mt-6 flex justify-end gap-3">
+          <button
+            type="button"
+            data-modal-cancel
+            class="inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08]"
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            data-modal-confirm
+            class="inline-flex min-h-11 items-center justify-center rounded-2xl bg-gradient-to-r from-liad-violet to-liad-purple px-4 text-sm font-semibold text-black transition hover:-translate-y-0.5"
+          >
+            Confirmar
+          </button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

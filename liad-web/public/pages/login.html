@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Entrar | LIAD</title>
+    <meta
+      name="description"
+      content="Acesse sua conta LIAD com email e senha ou continue com Google."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/css/global.css" />
+    <script src="/assets/js/tailwind-config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="/assets/js/login.js"></script>
+  </head>
+  <body class="bg-liad-bg font-body text-liad-text antialiased">
+    <main class="liad-auth-shell min-h-screen px-5 py-10 sm:px-8">
+      <div class="mx-auto grid min-h-[calc(100vh-5rem)] max-w-6xl items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+        <section class="hidden rounded-[32px] border border-white/10 bg-[rgba(19,19,21,0.72)] p-10 shadow-panel lg:block">
+          <a href="/" class="inline-flex items-center font-display text-2xl font-extrabold tracking-[-0.06em] text-transparent bg-gradient-to-r from-liad-purple to-liad-blue bg-clip-text">
+            LIAD
+          </a>
+          <h1 class="mt-10 max-w-md font-display text-6xl font-extrabold leading-[0.92] tracking-[-0.07em]">
+            Seu cockpit de vendas com IA começa aqui.
+          </h1>
+          <p class="mt-6 max-w-lg text-lg leading-8 text-liad-muted">
+            Entre para acompanhar a operacao da sua loja e preparar o dashboard que vamos evoluir nas proximas etapas.
+          </p>
+          <div class="mt-12 grid gap-4">
+            <article class="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+              <p class="text-sm font-semibold text-liad-text">Sessao persistente</p>
+              <p class="mt-2 text-sm leading-6 text-liad-muted">
+                O usuario permanece conectado ate escolher desconectar a conta.
+              </p>
+            </article>
+            <article class="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+              <p class="text-sm font-semibold text-liad-text">Acesso unico por CNPJ</p>
+              <p class="mt-2 text-sm leading-6 text-liad-muted">
+                Cada empresa possui uma unica conta, vinculada ao CNPJ cadastrado.
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="rounded-[32px] border border-white/10 bg-[rgba(19,19,21,0.88)] p-6 shadow-panel sm:p-8 lg:p-10">
+          <a href="/" class="font-display text-xl font-extrabold tracking-[-0.06em] text-transparent bg-gradient-to-r from-liad-purple to-liad-blue bg-clip-text lg:hidden">
+            LIAD
+          </a>
+
+          <div class="mt-4 lg:mt-0">
+            <h2 class="font-display text-4xl font-extrabold tracking-[-0.05em] text-liad-text">
+              Entrar na conta
+            </h2>
+            <p class="mt-3 text-sm leading-6 text-liad-muted">
+              Use seu email e senha ou continue com Google para completar o cadastro da empresa.
+            </p>
+          </div>
+
+          <div data-banner hidden class="mt-6 rounded-2xl border border-[#ff8439]/40 bg-[#ff8439]/10 px-4 py-3 text-sm text-[#ffd5bd]"></div>
+
+          <button
+            type="button"
+            data-google-login
+            class="mt-6 flex w-full items-center justify-center gap-3 rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-semibold text-black transition hover:-translate-y-0.5"
+          >
+            Continuar com Google
+          </button>
+
+          <div class="my-6 flex items-center gap-3 text-xs uppercase tracking-[0.2em] text-slate-500">
+            <span class="h-px flex-1 bg-white/10"></span>
+            ou
+            <span class="h-px flex-1 bg-white/10"></span>
+          </div>
+
+          <form data-login-form class="space-y-5" novalidate>
+            <div>
+              <label for="email" class="mb-2 block text-sm font-medium text-liad-text">Email</label>
+              <input
+                id="email"
+                name="email"
+                type="email"
+                autocomplete="email"
+                placeholder="seuemail@email.com"
+                class="liad-input"
+                required
+              />
+            </div>
+
+            <div>
+              <label for="password" class="mb-2 block text-sm font-medium text-liad-text">Senha</label>
+              <input
+                id="password"
+                name="password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Sua senha"
+                class="liad-input"
+                required
+              />
+            </div>
+
+            <button
+              type="submit"
+              class="w-full rounded-2xl bg-gradient-to-r from-liad-violet to-liad-purple px-5 py-3.5 font-display text-base font-bold text-black transition hover:-translate-y-0.5"
+            >
+              Entrar
+            </button>
+          </form>
+
+          <p class="mt-6 text-sm text-liad-muted">
+            Ainda nao tem conta?
+            <a href="/cadastro" class="font-semibold text-liad-purple">Criar conta</a>
+          </p>
+        </section>
+      </div>
+    </main>
+  </body>
+</html>

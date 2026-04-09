@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Completar Cadastro | LIAD</title>
+    <meta
+      name="description"
+      content="Complete os dados da empresa para acessar a LIAD."
+    />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/css/global.css" />
+    <script src="/assets/js/tailwind-config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script type="module" src="/assets/js/complete-profile.js"></script>
+  </head>
+  <body class="bg-liad-bg font-body text-liad-text antialiased">
+    <main class="liad-auth-shell min-h-screen px-5 py-10 sm:px-8">
+      <div class="mx-auto max-w-3xl rounded-[32px] border border-white/10 bg-[rgba(19,19,21,0.88)] p-6 shadow-panel sm:p-8 lg:p-10">
+        <a href="/" class="font-display text-xl font-extrabold tracking-[-0.06em] text-transparent bg-gradient-to-r from-liad-purple to-liad-blue bg-clip-text">
+          LIAD
+        </a>
+
+        <div class="mt-4">
+          <h1 class="font-display text-4xl font-extrabold tracking-[-0.05em]">Completar cadastro</h1>
+          <p class="mt-3 max-w-2xl text-sm leading-6 text-liad-muted">
+            Falta registrar a empresa vinculada a esta autenticacao. Depois disso, o acesso segue direto para o dashboard.
+          </p>
+        </div>
+
+        <div data-banner hidden class="mt-6 rounded-2xl border border-[#ff8439]/40 bg-[#ff8439]/10 px-4 py-3 text-sm text-[#ffd5bd]"></div>
+
+        <form data-complete-profile-form class="mt-8 grid gap-5 sm:grid-cols-2" novalidate>
+          <div class="sm:col-span-2">
+            <label for="storeName" class="mb-2 block text-sm font-medium">Nome da loja</label>
+            <input id="storeName" name="storeName" type="text" class="liad-input" placeholder="Nome da sua loja" required />
+            <p data-error-for="storeName" class="liad-field-error"></p>
+          </div>
+
+          <div>
+            <label for="ownerFirstName" class="mb-2 block text-sm font-medium">Nome do responsavel</label>
+            <input id="ownerFirstName" name="ownerFirstName" type="text" class="liad-input" required />
+            <p data-error-for="ownerFirstName" class="liad-field-error"></p>
+          </div>
+
+          <div>
+            <label for="ownerLastName" class="mb-2 block text-sm font-medium">Sobrenome do responsavel</label>
+            <input id="ownerLastName" name="ownerLastName" type="text" class="liad-input" required />
+            <p data-error-for="ownerLastName" class="liad-field-error"></p>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label for="email" class="mb-2 block text-sm font-medium">Email autenticado</label>
+            <input id="email" name="email" type="email" class="liad-input opacity-80" readonly />
+          </div>
+
+          <div>
+            <label for="cnpj" class="mb-2 block text-sm font-medium">CNPJ</label>
+            <input
+              id="cnpj"
+              name="cnpj"
+              inputmode="numeric"
+              class="liad-input"
+              placeholder="00.000.000/0000-00"
+              maxlength="18"
+              required
+            />
+            <p data-error-for="cnpj" class="liad-field-error"></p>
+          </div>
+
+          <div>
+            <label for="monthlyVisitsRange" class="mb-2 block text-sm font-medium">Visitas por mes</label>
+            <select id="monthlyVisitsRange" name="monthlyVisitsRange" class="liad-input" required>
+              <option value="">Selecione a faixa</option>
+              <option value="0_1k">Ate 1 mil visitas</option>
+              <option value="1k_10k">Entre 1 mil e 10 mil</option>
+              <option value="10k_50k">Entre 10 mil e 50 mil</option>
+              <option value="50k_200k">Entre 50 mil e 200 mil</option>
+              <option value="200k_plus">Mais de 200 mil</option>
+            </select>
+            <p data-error-for="monthlyVisitsRange" class="liad-field-error"></p>
+          </div>
+
+          <div class="sm:col-span-2 mt-2">
+            <button
+              type="submit"
+              class="w-full rounded-2xl bg-gradient-to-r from-liad-violet to-liad-purple px-5 py-3.5 font-display text-base font-bold text-black transition hover:-translate-y-0.5"
+            >
+              Salvar e entrar
+            </button>
+          </div>
+        </form>
+      </div>
+    </main>
+  </body>
+</html>
