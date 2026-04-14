@@ -1,3 +1,4 @@
+import { initProductsView } from "./products-view.js";
 import { signOut } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 import {
   getCurrentAccountContext,
@@ -21,7 +22,8 @@ import {
 const ROUTES = {
   "/dashboard": { label: "Dashboard", icon: "dashboard" },
   "/metricas": { label: "Metricas", icon: "metrics" },
-  "/api": { label: "API", icon: "api" }
+  "/api": { label: "API", icon: "api" },
+  "/produtos": { label: "Produtos", icon: "products" }
 };
 
 const DASHBOARD_METRICS = [
@@ -469,7 +471,8 @@ function getIconMarkup(icon) {
     upload: `<svg viewBox="0 0 24 24" ${base}><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>`,
     alert: `<svg viewBox="0 0 24 24" ${base}><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94A2 2 0 0 0 22.18 18L13.71 3.86a2 2 0 0 0-3.42 0Z"></path></svg>`,
     creditCard: `<svg viewBox="0 0 24 24" ${base}><rect x="2" y="5" width="20" height="14" rx="3"></rect><path d="M2 10h20"></path><path d="M6 15h4"></path></svg>`,
-    download: `<svg viewBox="0 0 24 24" ${base}><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>`
+    download: `<svg viewBox="0 0 24 24" ${base}><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>`,
+    products: `<svg viewBox="0 0 24 24" class="h-5 w-5 stroke-current" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M8 4v16"></path><path d="M3 9h18"></path><path d="M3 15h18"></path></svg>`,
   };
 
   return icons[icon] ?? "";
@@ -2065,11 +2068,21 @@ function renderCurrentView() {
   }
 
   elements.viewRoot.innerHTML =
-    state.currentRoute === "/dashboard"
-      ? renderDashboardView()
-      : state.currentRoute === "/metricas"
-        ? renderMetricsView()
+  state.currentRoute === "/dashboard"
+    ? renderDashboardView()
+    : state.currentRoute === "/metricas"
+      ? renderMetricsView()
+      : state.currentRoute === "/produtos"
+        ? "<div data-products-mount></div>"
         : renderApiView();
+
+  if (state.currentRoute === "/produtos") {
+    initProductsView(
+      elements.viewRoot.querySelector("[data-products-mount]"),
+      state.accountId,
+      openModal
+  );
+}
 
   bindViewInteractions();
   bindChartTooltips();
