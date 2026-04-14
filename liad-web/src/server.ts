@@ -53,6 +53,10 @@ app.get("/api", (req: Request, res: Response) => {
   sendPage(res, "dashboard.html");
 });
 
+app.get("/produtos", (req: Request, res: Response) => {
+  sendPage(res, "dashboard.html");
+});
+
 app.get("/api/firebase-config", (req: Request, res: Response) => {
   const config = {
     apiKey: process.env.FIREBASE_API_KEY ?? "",
