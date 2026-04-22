@@ -1,0 +1,188 @@
+/* ── Scroll-reveal base ── */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+              transform 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+}
+[data-reveal="fade"] {
+  transform: translateY(0);
+}
+[data-reveal="left"] {
+  transform: translateX(-32px);
+}
+[data-reveal="right"] {
+  transform: translateX(32px);
+}
+[data-reveal="scale"] {
+  transform: translateY(20px) scale(0.96);
+}
+[data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* Stagger delays */
+[data-delay="1"] { transition-delay: 0.08s; }
+[data-delay="2"] { transition-delay: 0.16s; }
+[data-delay="3"] { transition-delay: 0.24s; }
+[data-delay="4"] { transition-delay: 0.32s; }
+[data-delay="5"] { transition-delay: 0.40s; }
+[data-delay="6"] { transition-delay: 0.48s; }
+
+/* ── Hero entrance ── */
+.hero-badge {
+  opacity: 0;
+  transform: translateY(-12px);
+  animation: heroFadeDown 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.15s forwards;
+}
+.hero-h1 {
+  opacity: 0;
+  transform: translateY(22px);
+  animation: heroFadeUp 0.7s cubic-bezier(0.22, 1, 0.36, 1) 0.28s forwards;
+}
+.hero-sub {
+  opacity: 0;
+  transform: translateY(18px);
+  animation: heroFadeUp 0.65s cubic-bezier(0.22, 1, 0.36, 1) 0.42s forwards;
+}
+.hero-cta {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: heroFadeUp 0.6s cubic-bezier(0.22, 1, 0.36, 1) 0.56s forwards;
+}
+.hero-card {
+  opacity: 0;
+  transform: translateX(24px) scale(0.97);
+  animation: heroSlideCard 0.75s cubic-bezier(0.22, 1, 0.36, 1) 0.45s forwards;
+}
+.hero-badge-pill {
+  opacity: 0;
+  animation: heroPill 0.5s ease 0.9s forwards;
+}
+.hero-badge-pill2 {
+  opacity: 0;
+  animation: heroPill 0.5s ease 1.05s forwards;
+}
+
+@keyframes heroFadeDown {
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroFadeUp {
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes heroSlideCard {
+  to { opacity: 1; transform: translateX(0) scale(1); }
+}
+@keyframes heroPill {
+  to { opacity: 1; }
+}
+
+/* ── Logo pulse in nav ── */
+.nav-logo-img {
+  transition: filter 0.3s ease, transform 0.3s ease;
+}
+.nav-logo-img:hover {
+  filter: drop-shadow(0 0 8px rgba(204, 151, 255, 0.5));
+  transform: scale(1.06);
+}
+
+/* ── Logo glow in hero ── */
+.hero-logo-wrap {
+  opacity: 0;
+  transform: translateY(-10px);
+  animation: heroFadeDown 0.55s cubic-bezier(0.22, 1, 0.36, 1) 0.05s forwards;
+}
+
+/* ── Floating badges in hero ── */
+@keyframes floatY {
+  0%, 100% { transform: translateY(0px); }
+  50%       { transform: translateY(-6px); }
+}
+.badge-float-1 { animation: floatY 4s ease-in-out 0s infinite; }
+.badge-float-2 { animation: floatY 4.6s ease-in-out 0.8s infinite; }
+
+/* ── Gradient text shimmer (CTA section) ── */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position:  200% center; }
+}
+.cta-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgb(249 245 248) 0%,
+    rgb(204 151 255) 30%,
+    rgb(105 156 255) 60%,
+    rgb(249 245 248) 100%
+  );
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: shimmer 4s linear infinite;
+}
+
+/* ── Progress bar on scroll ── */
+#scroll-progress {
+  position: fixed;
+  top: 0; left: 0;
+  height: 2px;
+  width: 0%;
+  background: linear-gradient(90deg, rgb(156 72 234), rgb(105 156 255));
+  z-index: 9999;
+  transition: width 0.1s linear;
+}
+
+/* ── Logo watermark in CTA ── */
+.cta-logo-watermark {
+  opacity: 0.04;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── Feature card hover ── */
+.feature-card {
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+              border-color 0.3s ease,
+              box-shadow 0.35s ease;
+}
+.feature-card:hover {
+  transform: translateY(-6px);
+  border-color: rgba(204, 151, 255, 0.18);
+  box-shadow: 0 24px 48px rgba(0,0,0,0.22), 0 0 0 1px rgba(204,151,255,0.08);
+}
+
+/* ── Integration logo hover ── */
+.integration-tile {
+  transition: transform 0.3s ease, border-color 0.3s ease, background 0.3s ease;
+}
+.integration-tile:hover {
+  transform: translateY(-4px) scale(1.03);
+  border-color: rgba(204, 151, 255, 0.25);
+  background: rgba(204, 151, 255, 0.06);
+}
+
+/* ── Counter tick-up ── */
+.stat-number {
+  display: inline-block;
+  transition: transform 0.1s ease;
+}
+
+/* ── Header glassmorphism on scroll ── */
+header {
+  transition: background 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+header.scrolled {
+  border-bottom-color: rgba(255,255,255,0.08);
+  background: rgba(14, 14, 16, 0.97);
+  box-shadow: 0 1px 32px rgba(0,0,0,0.32);
+}
+    
+/* ── Footer logo ── */
+.footer-logo-img {
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+.footer-logo-img:hover {
+  opacity: 1;
+}
