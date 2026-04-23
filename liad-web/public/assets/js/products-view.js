@@ -2,7 +2,7 @@
 // products-view.js
 // Importe este arquivo no dashboard.js e chame renderProductsView()
 // ============================================================
-
+ 
 import {
   deleteProductsCsvUpload,
   formatFileSize,
@@ -10,7 +10,19 @@ import {
   listProductsCsvUploads,
   uploadProductsCsv
 } from "./products-csv.js";
-
+ 
+// Formatos aceitos
+const ACCEPTED_EXTENSIONS = [".csv", ".tsv", ".xlsx", ".xls", ".json"];
+const ACCEPTED_MIME_TYPES = [
+  "text/csv",
+  "text/tab-separated-values",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-excel",
+  "application/json"
+];
+const ACCEPTED_ACCEPT_ATTR =
+  ".csv,.tsv,.xlsx,.xls,.json,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/json";
+ 
 // Estado local da view de produtos
 const productsState = {
   uploads: [],
@@ -20,12 +32,12 @@ const productsState = {
   error: "",
   deleteTarget: null // { docId, storagePath, fileName }
 };
-
+ 
 // Referência ao container da view (injetado pelo dashboard)
 let viewContainer = null;
 let accountId = "";
 let onDeleteConfirm = null; // callback para o modal do dashboard
-
+ 
 // ------------------------------------------------------------------
 // Inicialização pública — chamada pelo dashboard ao montar a view
 // ------------------------------------------------------------------
@@ -37,11 +49,11 @@ export async function initProductsView(container, ctxAccountId, modalCallback) {
   productsState.deleteTarget = null;
   await loadUploads();
 }
-
+ 
 async function loadUploads() {
   productsState.loading = true;
   render();
-
+ 
   try {
     productsState.uploads = await listProductsCsvUploads(accountId);
     productsState.error = "";
@@ -53,35 +65,38 @@ async function loadUploads() {
     bindEvents();
   }
 }
-
+ 
 // ------------------------------------------------------------------
 // Upload
 // ------------------------------------------------------------------
 async function handleFileSelected(file) {
   if (!file) return;
-
-  if (!file.name.endsWith(".csv") && file.type !== "text/csv") {
-    setError("Apenas arquivos .csv sao aceitos.");
+ 
+  const extOk = ACCEPTED_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext));
+  const mimeOk = ACCEPTED_MIME_TYPES.includes(file.type);
+ 
+  if (!extOk && !mimeOk) {
+    setError("Formato nao suportado. Envie um arquivo .csv, .tsv, .xlsx, .xls ou .json.");
     return;
   }
-
+ 
   if (file.size > 10 * 1024 * 1024) {
     setError("O arquivo nao pode ultrapassar 10 MB.");
     return;
   }
-
+ 
   setError("");
   productsState.uploading = true;
   productsState.uploadProgress = 0;
   render();
   bindEvents();
-
+ 
   try {
     await uploadProductsCsv(accountId, file, (pct) => {
       productsState.uploadProgress = pct;
       updateProgressBar(pct);
     });
-
+ 
     productsState.uploads = await listProductsCsvUploads(accountId);
   } catch (error) {
     setError(error.message ?? "Nao foi possivel enviar o arquivo.");
@@ -92,13 +107,13 @@ async function handleFileSelected(file) {
     bindEvents();
   }
 }
-
+ 
 async function handleDelete(docId, storagePath, fileName) {
   if (!onDeleteConfirm) return;
-
+ 
   onDeleteConfirm({
     eyebrow: "Remover arquivo",
-    title: "Excluir este CSV?",
+    title: "Excluir este arquivo?",
     body: `O arquivo "${fileName}" sera removido permanentemente do Storage e do Firestore.`,
     confirmLabel: "Excluir arquivo",
     tone: "danger",
@@ -114,7 +129,7 @@ async function handleDelete(docId, storagePath, fileName) {
     }
   });
 }
-
+ 
 // ------------------------------------------------------------------
 // Helpers
 // ------------------------------------------------------------------
@@ -123,14 +138,14 @@ function setError(message) {
   const el = viewContainer?.querySelector("[data-products-error]");
   if (el) el.textContent = message;
 }
-
+ 
 function updateProgressBar(pct) {
   const bar = viewContainer?.querySelector("[data-upload-progress-bar]");
   const label = viewContainer?.querySelector("[data-upload-progress-label]");
   if (bar) bar.style.width = `${pct}%`;
   if (label) label.textContent = `${pct}%`;
 }
-
+ 
 function escHtml(value) {
   return String(value ?? "")
     .replaceAll("&", "&amp;")
@@ -139,16 +154,25 @@ function escHtml(value) {
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#39;");
 }
-
+ 
 function cardClass(extra = "") {
   return `overflow-hidden rounded-[28px] border border-white/10 bg-[rgba(19,19,21,0.88)] shadow-panel ${extra}`.trim();
 }
-
+ 
+function getFileIcon(fileName) {
+  const ext = fileName?.split(".").pop()?.toLowerCase() ?? "";
+  if (["xlsx", "xls"].includes(ext)) return "table";
+  if (ext === "json") return "json";
+  return "csv"; // csv, tsv e fallback
+}
+ 
 function getIconMarkup(icon) {
   const base = 'class="h-5 w-5 stroke-current" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
   const icons = {
     upload: `<svg viewBox="0 0 24 24" ${base}><path d="M12 16V4"></path><path d="m7 9 5-5 5 5"></path><path d="M5 20h14"></path></svg>`,
     csv: `<svg viewBox="0 0 24 24" ${base}><path d="M3 9h18"></path><path d="M3 15h18"></path><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M8 4v16"></path></svg>`,
+    table: `<svg viewBox="0 0 24 24" ${base}><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="M2 9h20"></path><path d="M2 15h20"></path><path d="M8 4v16"></path><path d="M16 4v16"></path></svg>`,
+    json: `<svg viewBox="0 0 24 24" ${base}><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"></path><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"></path></svg>`,
     trash: `<svg viewBox="0 0 24 24" ${base}><path d="M3 6h18"></path><path d="M8 6V4h8v2"></path><path d="M19 6l-1 14H6L5 6"></path><path d="M10 11v6"></path><path d="M14 11v6"></path></svg>`,
     download: `<svg viewBox="0 0 24 24" ${base}><path d="M12 3v12"></path><path d="m7 10 5 5 5-5"></path><path d="M5 21h14"></path></svg>`,
     spinner: `<svg viewBox="0 0 24 24" ${base} class="h-5 w-5 animate-spin stroke-current"><circle cx="12" cy="12" r="10" stroke-opacity="0.25"></circle><path d="M12 2a10 10 0 0 1 10 10" stroke-opacity="1"></path></svg>`,
@@ -156,7 +180,7 @@ function getIconMarkup(icon) {
   };
   return icons[icon] ?? "";
 }
-
+ 
 // ------------------------------------------------------------------
 // Render
 // ------------------------------------------------------------------
@@ -164,39 +188,39 @@ function render() {
   if (!viewContainer) return;
   viewContainer.innerHTML = buildHtml();
 }
-
+ 
 function buildHtml() {
   return `
     <div class="mb-5 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <h1 class="font-display text-[2.35rem] font-extrabold tracking-[-0.06em] text-liad-text sm:text-[2.8rem]">Produtos</h1>
         <p class="mt-3 max-w-3xl text-sm leading-7 text-liad-muted">
-          Envie arquivos CSV com o catalogo da sua loja. A IA usa esses dados para responder perguntas sobre produtos, precos e disponibilidade.
+          Envie arquivos com o catalogo da sua loja. A IA usa esses dados para responder perguntas sobre produtos, precos e disponibilidade.
         </p>
       </div>
     </div>
-
+ 
     ${buildUploadCard()}
     ${buildListCard()}
   `;
 }
-
+ 
 function buildUploadCard() {
   return `
     <section class="${cardClass("p-5 sm:p-6 mb-4")}">
       <div class="mb-4">
         <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">Importacao</p>
         <h2 class="mt-2 text-lg font-semibold text-liad-text">Enviar catalogo de produtos</h2>
-        <p class="mt-1 text-sm leading-6 text-liad-muted">Formato aceito: <strong class="text-liad-text">.csv</strong> — tamanho maximo 10 MB. O arquivo deve conter cabecalho na primeira linha.</p>
+        <p class="mt-1 text-sm leading-6 text-liad-muted">Formatos aceitos: <strong class="text-liad-text">.csv · .tsv · .xlsx · .xls · .json</strong> — tamanho maximo 10 MB. Arquivos tabulares devem conter cabecalho na primeira linha.</p>
       </div>
-
+ 
       ${productsState.uploading ? buildProgressState() : buildDropzone()}
-
+ 
       <p data-products-error class="mt-3 text-sm text-[#ffb49e]">${escHtml(productsState.error)}</p>
     </section>
   `;
 }
-
+ 
 function buildDropzone() {
   return `
     <label
@@ -206,18 +230,18 @@ function buildDropzone() {
       <input
         data-csv-input
         type="file"
-        accept=".csv,text/csv"
+        accept="${ACCEPTED_ACCEPT_ATTR}"
         class="hidden"
       />
       <span class="inline-flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.05] text-liad-purple transition group-hover:-translate-y-0.5">
         ${getIconMarkup("upload")}
       </span>
-      <span class="mt-4 text-base font-semibold text-liad-text">Arraste um arquivo CSV ou clique para selecionar</span>
-      <span class="mt-2 text-sm leading-6 text-liad-muted">Somente .csv — maximo 10 MB</span>
+      <span class="mt-4 text-base font-semibold text-liad-text">Arraste um arquivo ou clique para selecionar</span>
+      <span class="mt-2 text-sm leading-6 text-liad-muted">.csv · .tsv · .xlsx · .xls · .json — maximo 10 MB</span>
     </label>
   `;
 }
-
+ 
 function buildProgressState() {
   const pct = productsState.uploadProgress;
   return `
@@ -242,7 +266,7 @@ function buildProgressState() {
     </div>
   `;
 }
-
+ 
 function buildListCard() {
   return `
     <section class="${cardClass("p-5 sm:p-6")}">
@@ -253,12 +277,12 @@ function buildListCard() {
         </div>
         ${productsState.loading ? `<span class="text-sm text-liad-muted inline-flex items-center gap-2">${getIconMarkup("spinner")} Carregando...</span>` : ""}
       </div>
-
+ 
       ${buildListContent()}
     </section>
   `;
 }
-
+ 
 function buildListContent() {
   if (productsState.loading) {
     return `
@@ -267,7 +291,7 @@ function buildListContent() {
       </div>
     `;
   }
-
+ 
   if (productsState.uploads.length === 0) {
     return `
       <div class="flex min-h-[160px] flex-col items-center justify-center gap-3 text-center">
@@ -275,11 +299,11 @@ function buildListContent() {
           ${getIconMarkup("empty")}
         </span>
         <p class="text-sm font-medium text-liad-text">Nenhum arquivo enviado ainda</p>
-        <p class="text-sm text-liad-muted">Os CSVs enviados aparecem aqui para consulta e gerenciamento.</p>
+        <p class="text-sm text-liad-muted">Os arquivos enviados aparecem aqui para consulta e gerenciamento.</p>
       </div>
     `;
   }
-
+ 
   return `
     <div class="overflow-x-auto">
       <table class="min-w-[640px] w-full border-collapse">
@@ -299,7 +323,7 @@ function buildListContent() {
     </div>
   `;
 }
-
+ 
 function buildUploadRow(upload) {
   const status = upload.status ?? "pending";
   const statusBadge = {
@@ -307,19 +331,21 @@ function buildUploadRow(upload) {
     processed: "bg-emerald-400/12 text-emerald-300",
     error: "bg-[#ff8439]/12 text-[#ffe2d0]"
   }[status] ?? "bg-white/10 text-liad-muted";
-
+ 
   const statusLabel = {
     pending: "Aguardando IA",
     processed: "Processado",
     error: "Erro"
   }[status] ?? status;
-
+ 
+  const fileIcon = getFileIcon(upload.fileName);
+ 
   return `
     <tr class="border-b border-white/6 text-sm text-liad-text transition hover:bg-white/[0.03]">
       <td class="px-3 py-4">
         <span class="flex items-center gap-2.5">
           <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] text-liad-purple">
-            ${getIconMarkup("csv")}
+            ${getIconMarkup(fileIcon)}
           </span>
           <span class="truncate max-w-[220px] font-medium" title="${escHtml(upload.fileName)}">${escHtml(upload.fileName)}</span>
         </span>
@@ -358,39 +384,40 @@ function buildUploadRow(upload) {
     </tr>
   `;
 }
-
+ 
 // ------------------------------------------------------------------
 // Event binding
 // ------------------------------------------------------------------
 function bindEvents() {
   if (!viewContainer) return;
-
+ 
   const input = viewContainer.querySelector("[data-csv-input]");
   const dropzone = viewContainer.querySelector("[data-csv-dropzone]");
-
+ 
   input?.addEventListener("change", (e) => {
     handleFileSelected(e.target.files?.[0]);
     e.target.value = "";
   });
-
+ 
   dropzone?.addEventListener("dragover", (e) => {
     e.preventDefault();
     dropzone.classList.add("border-liad-purple/30", "bg-white/[0.04]");
   });
-
+ 
   dropzone?.addEventListener("dragleave", () => {
     dropzone.classList.remove("border-liad-purple/30", "bg-white/[0.04]");
   });
-
+ 
   dropzone?.addEventListener("drop", (e) => {
     e.preventDefault();
     dropzone.classList.remove("border-liad-purple/30", "bg-white/[0.04]");
     handleFileSelected(e.dataTransfer?.files?.[0]);
   });
-
+ 
   viewContainer.querySelectorAll("[data-delete-upload]").forEach((btn) => {
     btn.addEventListener("click", () => {
       handleDelete(btn.dataset.docId, btn.dataset.storagePath, btn.dataset.fileName);
     });
   });
 }
+ 
