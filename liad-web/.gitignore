@@ -31,3 +31,6 @@ coverage/
 *.suo
 *.ntvs*
 *.njsproj
+
+# Firebase service account
+service-account.json
