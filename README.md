@@ -1,99 +1,152 @@
-# LIAD Web
+# LIAD
 
-Aplicação web da LIAD com páginas públicas e fluxo de autenticação usando Firebase.
-O projeto utiliza **Node.js**, **TypeScript** e **Express** para servir arquivos estáticos e expor a configuração do Firebase para o frontend.
+Plataforma LIAD — assistente de vendas com IA para lojistas.
 
-## Visão Geral
+## Estrutura do repositório
 
-A aplicação possui as seguintes rotas principais:
+```
+Liad/
+  liad-web/   → Frontend + servidor de páginas (Node.js + Express + Firebase)
+  liad-ai/    → API de IA (Node.js + Express + Gemini + Firebase Admin)
+```
 
-- `/` - página inicial
-- `/login` - login com Google ou email/senha
-- `/cadastro` - criação de conta
-- `/completar-cadastro` - conclusão de onboarding após autenticação
-- `/dashboard` - área autenticada
-- `/metricas` - rota apontando para o dashboard atual
-- `/api` - rota apontando para o dashboard atual
-- `/api/firebase-config` - endpoint que entrega a configuração pública do Firebase
+---
 
-## Tecnologias Utilizadas
+## liad-web
 
-- Node.js
-- TypeScript
-- Express
+Aplicação web com páginas públicas e fluxo de autenticação usando Firebase.
+
+### Rotas
+
+| Rota | Descrição |
+|------|-----------|
+| `/` | Página inicial |
+| `/login` | Login com Google ou email/senha |
+| `/cadastro` | Criação de conta |
+| `/completar-cadastro` | Onboarding após autenticação |
+| `/dashboard` | Área autenticada |
+| `/metricas` | Métricas de performance |
+| `/produtos` | Upload e gerenciamento de CSVs de produtos |
+| `/api/firebase-config` | Entrega a configuração pública do Firebase |
+
+### Tecnologias
+
+- Node.js + TypeScript + Express
 - Firebase Authentication
 - Firebase Firestore
 - Firebase Storage
-- Tailwind via CDN no frontend
+- Tailwind via CDN
 
-## Pré-requisitos
-
-Antes de executar o projeto, garanta que você tenha instalado:
-
-- [Node.js](https://nodejs.org/) 18 ou superior
-- npm
-
-## Configuração do Ambiente
-
-Crie um arquivo `.env` na raiz do projeto com base no `.env.example`:
-
-Preencha os valores com as credenciais do seu projeto Firebase.
-
-## Como Executar o Projeto
-
-### 1. Instalar as dependências
+### Como executar
 
 ```bash
+cd liad-web
 npm install
-```
-
-### 2. Configurar o arquivo `.env`
-
-Crie o arquivo `.env` na raiz do projeto e preencha as variáveis de ambiente do Firebase.
-
-### 3. Executar em modo de desenvolvimento
-
-```bash
 npm run dev
 ```
 
-O servidor será iniciado em:
+Servidor iniciado em `http://localhost:3000`.
 
-```bash
-http://localhost:3000
+### Variáveis de ambiente
+
+Crie um `.env` baseado no `.env.example`:
+
+```env
+PORT=3000
+FIREBASE_API_KEY=
+FIREBASE_AUTH_DOMAIN=
+FIREBASE_PROJECT_ID=
+FIREBASE_STORAGE_BUCKET=
+FIREBASE_MESSAGING_SENDER_ID=
+FIREBASE_APP_ID=
+FIREBASE_MEASUREMENT_ID=
 ```
 
-Se a variável `PORT` estiver definida no `.env`, a aplicação usará esse valor.
+---
 
-## Build de Produção
+## liad-ai
 
-Para gerar os arquivos compilados:
+API de IA responsável por responder perguntas de clientes com base no catálogo de produtos enviado pelo lojista.
+
+### Rotas
+
+| Rota | Descrição |
+|------|-----------|
+| `POST /chat` | Recebe mensagem e retorna resposta da IA |
+| `GET /health` | Verifica se o serviço está no ar |
+
+### Tecnologias
+
+- Node.js + TypeScript + Express
+- Google Gemini 2.5 Flash
+- Firebase Admin SDK (Firestore + Storage)
+
+### Como funciona
+
+1. O lojista envia um CSV de produtos pelo dashboard
+2. O CSV é salvo no Firebase Storage
+3. Quando um cliente envia uma mensagem, o endpoint `/chat` busca o CSV mais recente do Storage
+4. O conteúdo do CSV é passado como contexto para o Gemini
+5. O Gemini responde com base nos dados do catálogo
+
+### Como executar
 
 ```bash
-npm run build
+cd liad-ai
+npm install
+npm run dev
 ```
 
-Os arquivos TypeScript serão compilados para a pasta `dist`.
+Servidor iniciado em `http://localhost:3001`.
 
-## Executar a versão compilada
+### Variáveis de ambiente
 
-Após o build, execute:
+Crie um `.env` baseado no `.env.example`:
+
+```env
+PORT=3001
+GEMINI_API_KEY=
+GOOGLE_APPLICATION_CREDENTIALS="./service-account.json"
+FIREBASE_STORAGE_BUCKET=
+```
+
+> O arquivo `service-account.json` deve ser baixado no Firebase Console → Configurações do projeto → Contas de serviço → Gerar nova chave privada. **Nunca suba esse arquivo para o repositório.**
+
+### Exemplo de requisição
 
 ```bash
-node dist/server.js
+POST http://localhost:3001/chat
+Content-Type: application/json
+
+{
+  "accountId": "00000000000000",
+  "message": "Quais produtos vocês têm?",
+  "history": []
+}
 ```
+
+### Resposta
+
+```json
+{
+  "reply": "Temos os seguintes produtos disponíveis..."
+}
+```
+
+---
+
+## Pré-requisitos
+
+- Node.js 18 ou superior
+- npm
+- Projeto Firebase configurado
+- Chave da API do Gemini (Google AI Studio)
 
 ## Firebase
 
-A aplicação depende da configuração do Firebase para autenticação e dados.
-As instruções complementares de setup estão em:
+As instruções de setup do Firebase estão em `liad-web/docs/firebase-auth-setup.md`, incluindo:
 
-- `docs/firebase-auth-setup.md`
-
-Esse documento inclui:
-
-- variáveis de ambiente
-- estrutura esperada no Firestore
-- regras recomendadas do Firestore
-- regras recomendadas do Storage
-- fluxo de autenticação implementado
+- Variáveis de ambiente
+- Estrutura esperada no Firestore
+- Regras recomendadas do Firestore e Storage
+- Fluxo de autenticação implementado
