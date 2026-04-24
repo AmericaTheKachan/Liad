@@ -1,7 +1,6 @@
 import path from "path";
 import express, { Request, Response } from "express";
 import { loadEnvFile } from "./utils/loadEnv";
-import chatRouter from "./routes/chat";
 
 loadEnvFile(path.join(process.cwd(), ".env"));
 
@@ -57,8 +56,6 @@ app.get("/api", (req: Request, res: Response) => {
 app.get("/produtos", (req: Request, res: Response) => {
   sendPage(res, "dashboard.html");
 });
-
-app.use("/api", chatRouter);
 
 app.get("/api/firebase-config", (req: Request, res: Response) => {
   const config = {
