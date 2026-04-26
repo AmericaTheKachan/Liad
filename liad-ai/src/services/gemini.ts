@@ -5,20 +5,15 @@ let client: GoogleGenerativeAI | null = null;
 function getGeminiClient(): GoogleGenerativeAI {
   if (!client) {
     const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY nao configurada no .env");
-    }
-
+    if (!apiKey) throw new Error("GEMINI_API_KEY nao configurada no .env");
     client = new GoogleGenerativeAI(apiKey);
   }
-
   return client;
 }
 
 export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
+  role: "user" | "model";
+  parts: [{ text: string }];
 }
 
 export async function askGemini(
@@ -32,12 +27,7 @@ export async function askGemini(
     systemInstruction: systemPrompt
   });
 
-  const geminiHistory = history.map((msg) => ({
-    role: msg.role === "assistant" ? "model" : "user",
-    parts: [{ text: msg.content }]
-  }));
-
-  const chat = model.startChat({ history: geminiHistory });
+  const chat = model.startChat({ history });
   const result = await chat.sendMessage(userMessage);
 
   return result.response.text();

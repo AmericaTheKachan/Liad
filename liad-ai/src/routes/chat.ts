@@ -38,7 +38,17 @@ router.post("/chat", async (req: Request, res: Response) => {
     return;
   }
 
-  const safeHistory = Array.isArray(history) ? history : [];
+  const safeHistory = Array.isArray(history)
+  ? history.filter(
+      (msg) =>
+        msg &&
+        (msg.role === "user" || msg.role === "model") &&
+        Array.isArray(msg.parts) &&
+        msg.parts.length > 0 &&
+        typeof msg.parts[0].text === "string" &&
+        msg.parts[0].text.trim().length > 0
+    ) as ChatMessage[]
+  : [];
 
   try {
     const [csvContent, account] = await Promise.all([
