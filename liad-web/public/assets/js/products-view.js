@@ -1,17 +1,13 @@
-// ============================================================
-// products-view.js
-// Importe este arquivo no dashboard.js e chame renderProductsView()
-// ============================================================
- 
 import {
   deleteProductsCsvUpload,
   formatFileSize,
   formatUploadDate,
   listProductsCsvUploads,
-  uploadProductsCsv
+  uploadProductsCsv,
+  markUploadAsProcessed,
+  markUploadAsError
 } from "./products-csv.js";
  
-// Formatos aceitos
 const ACCEPTED_EXTENSIONS = [".csv", ".tsv", ".xlsx", ".xls", ".json"];
 const ACCEPTED_MIME_TYPES = [
   "text/csv",
@@ -23,24 +19,19 @@ const ACCEPTED_MIME_TYPES = [
 const ACCEPTED_ACCEPT_ATTR =
   ".csv,.tsv,.xlsx,.xls,.json,text/csv,text/tab-separated-values,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/json";
  
-// Estado local da view de produtos
 const productsState = {
   uploads: [],
   loading: false,
   uploading: false,
   uploadProgress: 0,
   error: "",
-  deleteTarget: null // { docId, storagePath, fileName }
+  deleteTarget: null 
 };
  
-// Referência ao container da view (injetado pelo dashboard)
 let viewContainer = null;
 let accountId = "";
-let onDeleteConfirm = null; // callback para o modal do dashboard
+let onDeleteConfirm = null; 
  
-// ------------------------------------------------------------------
-// Inicialização pública — chamada pelo dashboard ao montar a view
-// ------------------------------------------------------------------
 export async function initProductsView(container, ctxAccountId, modalCallback) {
   viewContainer = container;
   accountId = ctxAccountId;
@@ -66,37 +57,45 @@ async function loadUploads() {
   }
 }
  
-// ------------------------------------------------------------------
-// Upload
-// ------------------------------------------------------------------
 async function handleFileSelected(file) {
   if (!file) return;
- 
+
   const extOk = ACCEPTED_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext));
   const mimeOk = ACCEPTED_MIME_TYPES.includes(file.type);
- 
+
   if (!extOk && !mimeOk) {
     setError("Formato nao suportado. Envie um arquivo .csv, .tsv, .xlsx, .xls ou .json.");
     return;
   }
- 
+
   if (file.size > 10 * 1024 * 1024) {
     setError("O arquivo nao pode ultrapassar 10 MB.");
     return;
   }
- 
+
   setError("");
   productsState.uploading = true;
   productsState.uploadProgress = 0;
   render();
   bindEvents();
- 
+
   try {
-    await uploadProductsCsv(accountId, file, (pct) => {
+    const uploadResult = await uploadProductsCsv(accountId, file, (pct) => {
       productsState.uploadProgress = pct;
       updateProgressBar(pct);
     });
- 
+
+    try {
+      if (file.name.toLowerCase().endsWith(".json")) {
+        const text = await file.text();
+        JSON.parse(text); 
+      }
+      
+      await markUploadAsProcessed(accountId, uploadResult.docId);
+    } catch (contentError) {
+      await markUploadAsError(accountId, uploadResult.docId, "Conteudo invalido: " + contentError.message);
+    }
+
     productsState.uploads = await listProductsCsvUploads(accountId);
   } catch (error) {
     setError(error.message ?? "Nao foi possivel enviar o arquivo.");
@@ -130,9 +129,6 @@ async function handleDelete(docId, storagePath, fileName) {
   });
 }
  
-// ------------------------------------------------------------------
-// Helpers
-// ------------------------------------------------------------------
 function setError(message) {
   productsState.error = message;
   const el = viewContainer?.querySelector("[data-products-error]");
@@ -163,7 +159,7 @@ function getFileIcon(fileName) {
   const ext = fileName?.split(".").pop()?.toLowerCase() ?? "";
   if (["xlsx", "xls"].includes(ext)) return "table";
   if (ext === "json") return "json";
-  return "csv"; // csv, tsv e fallback
+  return "csv"; 
 }
  
 function getIconMarkup(icon) {
@@ -181,9 +177,6 @@ function getIconMarkup(icon) {
   return icons[icon] ?? "";
 }
  
-// ------------------------------------------------------------------
-// Render
-// ------------------------------------------------------------------
 function render() {
   if (!viewContainer) return;
   viewContainer.innerHTML = buildHtml();
@@ -329,7 +322,7 @@ function buildUploadRow(upload) {
   const statusBadge = {
     pending: "bg-[#ffbd59]/12 text-[#ffe4ae]",
     processed: "bg-emerald-400/12 text-emerald-300",
-    error: "bg-[#ff8439]/12 text-[#ffe2d0]"
+    error: "bg-red-500/12 text-red-400"
   }[status] ?? "bg-white/10 text-liad-muted";
  
   const statusLabel = {
@@ -385,9 +378,7 @@ function buildUploadRow(upload) {
   `;
 }
  
-// ------------------------------------------------------------------
-// Event binding
-// ------------------------------------------------------------------
+
 function bindEvents() {
   if (!viewContainer) return;
  

@@ -6,7 +6,8 @@ import {
   orderBy,
   query,
   serverTimestamp,
-  setDoc
+  setDoc,
+  updateDoc
 } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-firestore.js";
 import {
   deleteObject,
@@ -140,4 +141,27 @@ export function formatUploadDate(timestamp) {
     hour: "2-digit",
     minute: "2-digit"
   }).format(date);
+}
+async function updateProductsCsvStatus(accountId, docId, status, errorMessage = null) {
+  const { db } = await getFirebaseServices();
+  const docRef = doc(db, "accounts", accountId, "csvUploads", docId);
+  
+  const updateData = { 
+    status,
+    updatedAt: serverTimestamp() 
+  };
+  
+  if (errorMessage) {
+    updateData.errorMessage = errorMessage;
+  }
+
+  return await updateDoc(docRef, updateData); 
+}
+
+export async function markUploadAsProcessed(accountId, docId) {
+  return updateProductsCsvStatus(accountId, docId, "processed");
+}
+
+export async function markUploadAsError(accountId, docId, errorMessage) {
+  return updateProductsCsvStatus(accountId, docId, "error", errorMessage);
 }
