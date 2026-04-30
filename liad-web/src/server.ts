@@ -57,6 +57,23 @@ app.get("/produtos", (req: Request, res: Response) => {
   sendPage(res, "dashboard.html");
 });
 
+// ✅ NOVAS ROTAS
+app.get("/termos", (req: Request, res: Response) => {
+  sendPage(res, "termos.html");
+});
+
+app.get("/privacidade", (req: Request, res: Response) => {
+  sendPage(res, "privacidade.html");
+});
+
+app.get("/contato", (req: Request, res: Response) => {
+  sendPage(res, "contato.html");
+});
+
+app.get("/documentacao", (req: Request, res: Response) => {
+  sendPage(res, "documentacao.html");
+});
+
 app.get("/api/firebase-config", (req: Request, res: Response) => {
   const config = {
     apiKey: process.env.FIREBASE_API_KEY ?? "",
