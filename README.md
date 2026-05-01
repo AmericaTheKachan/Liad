@@ -73,6 +73,7 @@ API de IA responsável por responder perguntas de clientes com base no catálogo
 | Rota | Descrição |
 |------|-----------|
 | `POST /chat` | Recebe mensagem e retorna resposta da IA |
+| `GET /widget.js` | Entrega o script do widget de atendimento |
 | `GET /health` | Verifica se o serviço está no ar |
 
 ### Tecnologias
@@ -98,6 +99,16 @@ npm run dev
 ```
 
 Servidor iniciado em `http://localhost:3001`.
+
+### Widget
+
+Com o `liad-ai` rodando, o widget fica disponível em:
+
+```html
+<script src="http://localhost:3001/widget.js" data-account-id="ID_DA_CONTA"></script>
+```
+
+O mesmo script também aceita `data-liad-key` e `data-key` para manter compatibilidade com os snippets exibidos no painel.
 
 ### Variáveis de ambiente
 

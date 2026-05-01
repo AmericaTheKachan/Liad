@@ -1,10 +1,35 @@
 (function () {
-  const LIAD_AI_URL = "http://localhost:3001";
+  const SCRIPT = document.currentScript;
+  const DEFAULT_AI_ORIGIN = "http://localhost:3001";
+  const LIAD_SCRIPT_ORIGIN = (function () {
+    if (!SCRIPT || !SCRIPT.src) return DEFAULT_AI_ORIGIN;
+    try {
+      return new URL(SCRIPT.src, window.location.href).origin;
+    } catch {
+      return DEFAULT_AI_ORIGIN;
+    }
+  })();
+  const LIAD_AI_URL = (function () {
+    const configuredApiUrl = SCRIPT
+      ? SCRIPT.getAttribute("data-api-url") || SCRIPT.getAttribute("data-liad-api-url")
+      : "";
+    if (!configuredApiUrl) return LIAD_SCRIPT_ORIGIN;
+    try {
+      return new URL(configuredApiUrl, window.location.href).href.replace(/\/+$/, "");
+    } catch {
+      return LIAD_SCRIPT_ORIGIN;
+    }
+  })();
+  const LIAD_LOGO_URL = new URL("/assets/images/logo.png", LIAD_SCRIPT_ORIGIN).href;
   const WELCOME_MESSAGE = "Olá! Como posso te ajudar?";
 
   const ACCOUNT_ID = (function () {
-    const s = document.currentScript;
-    return s ? s.getAttribute("data-account-id") || "" : "";
+    return SCRIPT
+      ? SCRIPT.getAttribute("data-account-id") ||
+          SCRIPT.getAttribute("data-liad-key") ||
+          SCRIPT.getAttribute("data-key") ||
+          ""
+      : "";
   })();
 
   const styles = `
@@ -16,7 +41,7 @@
       right: 28px;
       width: 56px;
       height: 56px;
-      background: #0a0a0a;
+      background: #0a0a0a url('${LIAD_LOGO_URL}') center/50px no-repeat;
       border-radius: 50%;
       cursor: pointer;
       border: none;
@@ -34,10 +59,9 @@
     #liad-widget-btn svg {
       transition: opacity 0.2s ease, transform 0.2s ease;
     }
-    #liad-widget-btn .icon-logo { opacity: 1; position: absolute; }
-    #liad-widget-btn .icon-close { opacity: 0; position: absolute; transform: rotate(-90deg); }
-    #liad-widget-btn.open .icon-logo { opacity: 0; transform: rotate(90deg); }
+    #liad-widget-btn .icon-close { opacity: 0; position: absolute; transform: rotate(-90deg); transition: opacity 0.2s ease, transform 0.2s ease; }
     #liad-widget-btn.open .icon-close { opacity: 1; transform: rotate(0deg); }
+    #liad-widget-btn.open { background-image: none; }
 
     #liad-widget-panel {
       position: fixed;
@@ -252,11 +276,7 @@
     document.head.appendChild(el);
   }
 
-  const LOGO_SVG = `<svg width="22" height="22" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-logo">
-    <rect x="4" y="4" width="12" height="28" rx="2" fill="white"/>
-    <rect x="20" y="4" width="12" height="12" rx="2" fill="white" opacity="0.7"/>
-    <rect x="20" y="20" width="12" height="12" rx="2" fill="white" opacity="0.45"/>
-  </svg>`;
+  const LOGO_SVG = `<span class="icon-logo"></span>`;
 
   const CLOSE_SVG = `<svg width="18" height="18" viewBox="0 0 18 18" fill="none" xmlns="http://www.w3.org/2000/svg" class="icon-close">
     <path d="M14 4L4 14M4 4l10 10" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
@@ -279,11 +299,7 @@
     panel.innerHTML = `
       <div id="liad-panel-header">
         <div id="liad-panel-header-avatar">
-          <svg width="16" height="16" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect x="4" y="4" width="12" height="28" rx="2" fill="white" opacity="0.9"/>
-            <rect x="20" y="4" width="12" height="12" rx="2" fill="white" opacity="0.6"/>
-            <rect x="20" y="20" width="12" height="12" rx="2" fill="white" opacity="0.35"/>
-          </svg>
+          <img src="${LIAD_LOGO_URL}" width="40" height="40" style="object-fit:contain;" alt="LIAD"/>
         </div>
         <div id="liad-panel-header-info">
           <div id="liad-panel-header-name">Assistente LIAD</div>
