@@ -1,10 +1,35 @@
 (function () {
-  const LIAD_AI_URL = "http://localhost:3001";
+  const SCRIPT = document.currentScript;
+  const DEFAULT_AI_ORIGIN = "http://localhost:3001";
+  const LIAD_SCRIPT_ORIGIN = (function () {
+    if (!SCRIPT || !SCRIPT.src) return DEFAULT_AI_ORIGIN;
+    try {
+      return new URL(SCRIPT.src, window.location.href).origin;
+    } catch {
+      return DEFAULT_AI_ORIGIN;
+    }
+  })();
+  const LIAD_AI_URL = (function () {
+    const configuredApiUrl = SCRIPT
+      ? SCRIPT.getAttribute("data-api-url") || SCRIPT.getAttribute("data-liad-api-url")
+      : "";
+    if (!configuredApiUrl) return LIAD_SCRIPT_ORIGIN;
+    try {
+      return new URL(configuredApiUrl, window.location.href).href.replace(/\/+$/, "");
+    } catch {
+      return LIAD_SCRIPT_ORIGIN;
+    }
+  })();
+  const LIAD_LOGO_URL = new URL("/assets/images/logo.png", LIAD_SCRIPT_ORIGIN).href;
   const WELCOME_MESSAGE = "Olá! Como posso te ajudar?";
 
   const ACCOUNT_ID = (function () {
-    const s = document.currentScript;
-    return s ? s.getAttribute("data-account-id") || "" : "";
+    return SCRIPT
+      ? SCRIPT.getAttribute("data-account-id") ||
+          SCRIPT.getAttribute("data-liad-key") ||
+          SCRIPT.getAttribute("data-key") ||
+          ""
+      : "";
   })();
 
   const styles = `
@@ -16,7 +41,7 @@
       right: 28px;
       width: 56px;
       height: 56px;
-      background: #0a0a0a url('http://localhost:3000/assets/images/logo.png') center/50px no-repeat;
+      background: #0a0a0a url('${LIAD_LOGO_URL}') center/50px no-repeat;
       border-radius: 50%;
       cursor: pointer;
       border: none;
@@ -274,7 +299,7 @@
     panel.innerHTML = `
       <div id="liad-panel-header">
         <div id="liad-panel-header-avatar">
-          <img src="http://localhost:3000/assets/images/logo.png" width="40" height="40" style="object-fit:contain;" alt="LIAD"/>
+          <img src="${LIAD_LOGO_URL}" width="40" height="40" style="object-fit:contain;" alt="LIAD"/>
         </div>
         <div id="liad-panel-header-info">
           <div id="liad-panel-header-name">Assistente LIAD</div>

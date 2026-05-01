@@ -8,9 +8,11 @@ loadEnvFile(path.join(process.cwd(), ".env"));
 
 const app = express();
 const port = Number(process.env.PORT ?? "3001");
+const publicDir = path.join(__dirname, "..", "public");
 
 app.use(cors());
 app.use(express.json());
+app.use(express.static(publicDir, { index: false }));
 
 app.get("/health", (_req: Request, res: Response) => {
   res.json({ status: "ok" });
