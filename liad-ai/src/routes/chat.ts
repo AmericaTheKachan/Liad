@@ -1,24 +1,19 @@
 import { Request, Response, Router } from "express";
 import { askGemini, ChatMessage } from "../services/gemini";
 import { getAccountData, getLatestCsvForAccount } from "../services/firebase-admin";
+import fs from "fs";
+import path from "path";
 
 const router = Router();
 
 function buildSystemPrompt(storeName: string, csvContent: string | null): string {
-  const catalogSection = csvContent
-    ? `\nCATÁLOGO DE PRODUTOS (CSV):\n${csvContent}\n`
-    : "\n(Nenhum catálogo de produtos foi enviado ainda para esta loja.)\n";
-
-  return `Você é um assistente de vendas da loja "${storeName}", integrado via LIAD.
-Seu papel é responder perguntas de clientes sobre produtos, preços, disponibilidade e características.
-
-Regras:
-- Responda sempre em português, de forma amigável e direta.
-- Use apenas as informações do catálogo abaixo. Não invente produtos ou preços.
-- Se o cliente perguntar algo fora do catálogo, diga que não tem essa informação e ofereça ajuda com o que está disponível.
-- Seja conciso. Evite respostas longas demais.
-- Nunca revele que é uma IA a menos que o cliente pergunte diretamente.
-${catalogSection}`;
+  const promptPath = path.join(__dirname, "system-prompt.md");
+  let promptTemplate = fs.readFileSync(promptPath, "utf-8");
+  
+  promptTemplate = promptTemplate.replace("{storeName}", storeName);
+  promptTemplate = promptTemplate.replace("{csvContent}", csvContent ? csvContent.trim() : "No catalog available");
+  
+  return promptTemplate;
 }
 
 router.post("/chat", async (req: Request, res: Response) => {
