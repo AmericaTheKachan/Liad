@@ -1,20 +1,72 @@
 import { Request, Response, Router } from "express";
+import rateLimit from "express-rate-limit";
 import { askGemini, ChatMessage } from "../services/gemini";
 import { getAccountData, getLatestCsvForAccount } from "../services/firebase-admin";
+import {
+  buildIndex,
+  searchProducts,
+  hasIndex,
+  getIndexHash,
+  getIndexSize,
+  csvHash,
+  Product,
+} from "../services/semantic-search";
 import fs from "fs";
 import path from "path";
+import { parse } from "csv-parse/sync";
 
 const router = Router();
 
-function buildSystemPrompt(storeName: string, csvContent: string | null): string {
-  const promptPath = path.join(__dirname, "system-prompt.md");
-  let promptTemplate = fs.readFileSync(promptPath, "utf-8");
-  
-  promptTemplate = promptTemplate.replace("{storeName}", storeName);
-  promptTemplate = promptTemplate.replace("{csvContent}", csvContent ? csvContent.trim() : "No catalog available");
-  
-  return promptTemplate;
+// ─── Rate limiting ────────────────────────────────────────────────────────────
+// 30 requests / minute per accountId (falls back to IP)
+
+const limiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 30,
+  keyGenerator: (req) => {
+    const body = req.body as { accountId?: string };
+    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown";
+    return body?.accountId ?? ip;
+  },
+  handler: (_req, res) => {
+    res.status(429).json({ error: "Muitas requisições. Aguarde um momento e tente novamente." });
+  },
+});
+
+router.use(limiter);
+
+// ─── CSV helpers ──────────────────────────────────────────────────────────────
+
+function parseCsv(csvContent: string): Product[] {
+  try {
+    return parse(csvContent, {
+      columns: true,
+      skip_empty_lines: true,
+      trim: true,
+    }) as Product[];
+  } catch {
+    return [];
+  }
 }
+
+function productsToPromptCsv(products: Product[]): string {
+  if (products.length === 0) return "No products found.";
+  const headers = Object.keys(products[0]);
+  const rows = products.map((p) => headers.map((h) => p[h] ?? "").join(","));
+  return [headers.join(","), ...rows].join("\n");
+}
+
+// ─── Prompt builder ───────────────────────────────────────────────────────────
+
+function buildSystemPrompt(storeName: string, csvContent: string): string {
+  const promptPath = path.join(__dirname, "system-prompt.md");
+  let template = fs.readFileSync(promptPath, "utf-8");
+  template = template.replace("{storeName}", storeName);
+  template = template.replace("{csvContent}", csvContent);
+  return template;
+}
+
+// ─── Route ────────────────────────────────────────────────────────────────────
 
 router.post("/chat", async (req: Request, res: Response) => {
   const { accountId, message, history } = req.body as {
@@ -33,22 +85,25 @@ router.post("/chat", async (req: Request, res: Response) => {
     return;
   }
 
-  const safeHistory = Array.isArray(history)
-  ? history.filter(
-      (msg) =>
-        msg &&
-        (msg.role === "user" || msg.role === "model") &&
-        Array.isArray(msg.parts) &&
-        msg.parts.length > 0 &&
-        typeof msg.parts[0].text === "string" &&
-        msg.parts[0].text.trim().length > 0
-    ) as ChatMessage[]
-  : [];
+  // Validate + trim history — keep only last 6 turns (3 exchanges)
+  const safeHistory = (
+    Array.isArray(history)
+      ? history.filter(
+          (msg) =>
+            msg &&
+            (msg.role === "user" || msg.role === "model") &&
+            Array.isArray(msg.parts) &&
+            msg.parts.length > 0 &&
+            typeof msg.parts[0].text === "string" &&
+            msg.parts[0].text.trim().length > 0
+        )
+      : []
+  ).slice(-6) as ChatMessage[];
 
   try {
-    const [csvContent, account] = await Promise.all([
+    const [rawCsv, account] = await Promise.all([
       getLatestCsvForAccount(accountId),
-      getAccountData(accountId)
+      getAccountData(accountId),
     ]);
 
     if (!account) {
@@ -57,14 +112,45 @@ router.post("/chat", async (req: Request, res: Response) => {
     }
 
     const storeName: string = account.storeName ?? "Loja";
-    const systemPrompt = buildSystemPrompt(storeName, csvContent);
+
+    // ── Build/refresh index with hash-based invalidation ──────────────────
+    if (rawCsv) {
+      const currentHash = csvHash(rawCsv);
+      const needsRebuild = !hasIndex(accountId) || getIndexHash(accountId) !== currentHash;
+
+      if (needsRebuild) {
+        const products = parseCsv(rawCsv);
+        if (products.length > 0) {
+          await buildIndex(accountId, products, currentHash);
+        }
+      }
+    }
+
+    // ── Dynamic topK: small catalogs get everything, large ones get top 8 ─
+    const catalogSize = getIndexSize(accountId);
+    const topK = catalogSize < 30 ? catalogSize : 8;
+
+    // ── Semantic search — enrich query with last user turn for context ─────
+    const lastUserMsg = safeHistory
+      .filter((m) => m.role === "user")
+      .slice(-1)[0]?.parts[0]?.text ?? "";
+
+    const searchQuery = lastUserMsg
+      ? `${lastUserMsg} ${message.trim()}`
+      : message.trim();
+
+    const relevantProducts = await searchProducts(accountId, searchQuery, topK);
+    const filteredCsv = productsToPromptCsv(relevantProducts);
+
+    // ── Call Gemini with filtered catalog ─────────────────────────────────
+    const systemPrompt = buildSystemPrompt(storeName, filteredCsv);
     const reply = await askGemini(systemPrompt, safeHistory, message.trim());
 
     res.json({ reply });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Erro interno.";
+    const msg = error instanceof Error ? error.message : "Erro interno.";
     console.error("[/api/chat]", error);
-    res.status(500).json({ error: message });
+    res.status(500).json({ error: msg });
   }
 });
 
