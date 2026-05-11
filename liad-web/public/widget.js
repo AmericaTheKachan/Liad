@@ -1,10 +1,46 @@
 (function () {
-  const LIAD_AI_URL = "http://localhost:3001";
   const WELCOME_MESSAGE = "Olá! Como posso te ajudar?";
+  const LOCAL_AI_URL = "http://localhost:3001";
+
+  const SCRIPT_EL = (function () {
+    return document.currentScript || document.querySelector('script[src*="widget.js"]');
+  })();
 
   const ACCOUNT_ID = (function () {
-    const s = document.currentScript;
-    return s ? s.getAttribute("data-account-id") || "" : "";
+    if (!SCRIPT_EL) return "";
+
+    return (
+      SCRIPT_EL.getAttribute("data-account-id") ||
+      SCRIPT_EL.getAttribute("data-liad-account-id") ||
+      SCRIPT_EL.getAttribute("data-liad-key") ||
+      ""
+    ).trim();
+  })();
+
+  const LIAD_AI_URL = (function () {
+    const explicitUrl =
+      SCRIPT_EL?.getAttribute("data-api-url") ||
+      SCRIPT_EL?.getAttribute("data-liad-api-url") ||
+      "";
+
+    if (explicitUrl.trim()) {
+      return explicitUrl.trim().replace(/\/+$/, "");
+    }
+
+    try {
+      if (!SCRIPT_EL?.src) return LOCAL_AI_URL;
+
+      const scriptUrl = new URL(SCRIPT_EL.src, window.location.href);
+      const isLocalHost = ["localhost", "127.0.0.1", "::1"].includes(scriptUrl.hostname);
+
+      if (isLocalHost && scriptUrl.port !== "3001") {
+        return LOCAL_AI_URL;
+      }
+
+      return scriptUrl.origin;
+    } catch {
+      return LOCAL_AI_URL;
+    }
   })();
 
   const styles = `
