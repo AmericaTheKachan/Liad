@@ -13,9 +13,7 @@ const port = Number(process.env.PORT ?? "3001");
 function findWidgetFile(): string | null {
   const candidates = [
     path.join(process.cwd(), "public", "widget.js"),
-    path.join(__dirname, "..", "public", "widget.js"),
-    path.join(process.cwd(), "..", "liad-web", "public", "widget.js"),
-    path.join(__dirname, "..", "..", "liad-web", "public", "widget.js")
+    path.join(__dirname, "..", "public", "widget.js")
   ];
 
   return candidates.find((candidate) => fs.existsSync(candidate)) ?? null;
