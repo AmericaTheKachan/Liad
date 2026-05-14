@@ -8,7 +8,8 @@ import {
   formatFileSize,
   formatUploadDate,
   listProductsCsvUploads,
-  uploadProductsCsv
+  uploadProductsCsv,
+  updateProductsCsvStatus
 } from "./products-csv.js";
  
 // Formatos aceitos
@@ -71,38 +72,108 @@ async function loadUploads() {
 // ------------------------------------------------------------------
 async function handleFileSelected(file) {
   if (!file) return;
- 
-  const extOk = ACCEPTED_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext));
+
+  const extOk = ACCEPTED_EXTENSIONS.some((ext) =>
+    file.name.toLowerCase().endsWith(ext)
+  );
+
   const mimeOk = ACCEPTED_MIME_TYPES.includes(file.type);
- 
+
   if (!extOk && !mimeOk) {
-    setError("Formato nao suportado. Envie um arquivo .csv, .tsv, .xlsx, .xls ou .json.");
+    setError(
+      "Formato nao suportado. Envie um arquivo .csv, .tsv, .xlsx, .xls ou .json."
+    );
     return;
   }
- 
+
   if (file.size > 10 * 1024 * 1024) {
     setError("O arquivo nao pode ultrapassar 10 MB.");
     return;
   }
- 
+
   setError("");
+
   productsState.uploading = true;
   productsState.uploadProgress = 0;
+
   render();
   bindEvents();
- 
+
   try {
-    await uploadProductsCsv(accountId, file, (pct) => {
-      productsState.uploadProgress = pct;
-      updateProgressBar(pct);
-    });
- 
-    productsState.uploads = await listProductsCsvUploads(accountId);
+    const result = await uploadProductsCsv(
+      accountId,
+      file,
+      (pct) => {
+        productsState.uploadProgress = pct;
+        updateProgressBar(pct);
+      }
+    );
+
+    try {
+      const extension =
+        file.name.split(".").pop()?.toLowerCase() ?? "";
+
+      if (["csv", "tsv"].includes(extension)) {
+        const text = await file.text();
+
+        if (!text || text.trim().length === 0) {
+          throw new Error("Arquivo vazio.");
+        }
+
+        const lines = text
+          .split("\n")
+          .filter((line) => line.trim().length > 0);
+
+        if (lines.length < 2) {
+          throw new Error(
+            "O arquivo precisa possuir cabecalho e pelo menos uma linha."
+          );
+        }
+      } else if (extension === "json") {
+        const text = await file.text();
+
+        JSON.parse(text);
+      } else if (["xlsx", "xls"].includes(extension)) {
+        if (file.size <= 0) {
+          throw new Error("Planilha invalida.");
+        }
+      }
+
+      await updateProductsCsvStatus(
+        accountId,
+        result.docId,
+        "processed"
+      );
+
+    } catch (processingError) {
+
+      await updateProductsCsvStatus(
+        accountId,
+        result.docId,
+        "error",
+        {
+          errorMessage:
+            processingError.message ??
+            "Erro ao processar arquivo."
+        }
+      );
+    }
+
+    productsState.uploads =
+      await listProductsCsvUploads(accountId);
+
   } catch (error) {
-    setError(error.message ?? "Nao foi possivel enviar o arquivo.");
+
+    setError(
+      error.message ??
+      "Nao foi possivel enviar o arquivo."
+    );
+
   } finally {
+
     productsState.uploading = false;
     productsState.uploadProgress = 0;
+
     render();
     bindEvents();
   }
@@ -329,7 +400,7 @@ function buildUploadRow(upload) {
   const statusBadge = {
     pending: "bg-[#ffbd59]/12 text-[#ffe4ae]",
     processed: "bg-emerald-400/12 text-emerald-300",
-    error: "bg-[#ff8439]/12 text-[#ffe2d0]"
+    error: "bg-red-500/12 text-red-300"
   }[status] ?? "bg-white/10 text-liad-muted";
  
   const statusLabel = {
