@@ -4,32 +4,39 @@ import { askGemini, ChatMessage } from "../services/gemini";
 import { getAccountData, getLatestCsvForAccount } from "../services/firebase-admin";
 import {
   buildIndex,
-  searchProducts,
   hasIndex,
   getIndexHash,
   getIndexSize,
+  getIndexItems,
+  getEmbedding,
+  getSemanticScores,
   csvHash,
-  Product,
 } from "../services/semantic-search";
+import { Product } from "../services/schema-analysis";
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
 
-const router = Router();
+const router: Router = Router();
 
-// ─── Rate limiting ────────────────────────────────────────────────────────────
+// ─── Rate limiter ─────────────────────────────────────────────────────────────
 // 30 requests / minute per accountId (falls back to IP)
 
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
-  keyGenerator: (req) => {
+  keyGenerator: (req: Request) => {
     const body = req.body as { accountId?: string };
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown";
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+      req.socket.remoteAddress ??
+      "unknown";
     return body?.accountId ?? ip;
   },
-  handler: (_req, res) => {
-    res.status(429).json({ error: "Muitas requisições. Aguarde um momento e tente novamente." });
+  handler: (_req: Request, res: Response) => {
+    res
+      .status(429)
+      .json({ error: "Muitas requisições. Aguarde um momento e tente novamente." });
   },
 });
 
@@ -54,6 +61,25 @@ function productsToPromptCsv(products: Product[]): string {
   const headers = Object.keys(products[0]);
   const rows = products.map((p) => headers.map((h) => p[h] ?? "").join(","));
   return [headers.join(","), ...rows].join("\n");
+}
+
+// ─── Semantic search ──────────────────────────────────────────────────────────
+
+async function searchProducts(
+  accountId: string,
+  query: string,
+  topK: number
+): Promise<Product[]> {
+  const items = getIndexItems(accountId);
+  if (items.length === 0) return [];
+
+  const queryEmbedding = await getEmbedding(query);
+  const scored = await getSemanticScores(queryEmbedding, items);
+
+  return scored
+    .sort((a, b) => b.score - a.score)
+    .slice(0, topK)
+    .map((s) => s.product);
 }
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
@@ -89,14 +115,14 @@ router.post("/chat", async (req: Request, res: Response) => {
   const safeHistory = (
     Array.isArray(history)
       ? history.filter(
-          (msg) =>
-            msg &&
-            (msg.role === "user" || msg.role === "model") &&
-            Array.isArray(msg.parts) &&
-            msg.parts.length > 0 &&
-            typeof msg.parts[0].text === "string" &&
-            msg.parts[0].text.trim().length > 0
-        )
+        (msg) =>
+          msg &&
+          (msg.role === "user" || msg.role === "model") &&
+          Array.isArray(msg.parts) &&
+          msg.parts.length > 0 &&
+          typeof msg.parts[0].text === "string" &&
+          msg.parts[0].text.trim().length > 0
+      )
       : []
   ).slice(-6) as ChatMessage[];
 
@@ -116,7 +142,8 @@ router.post("/chat", async (req: Request, res: Response) => {
     // ── Build/refresh index with hash-based invalidation ──────────────────
     if (rawCsv) {
       const currentHash = csvHash(rawCsv);
-      const needsRebuild = !hasIndex(accountId) || getIndexHash(accountId) !== currentHash;
+      const needsRebuild =
+        !hasIndex(accountId) || getIndexHash(accountId) !== currentHash;
 
       if (needsRebuild) {
         const products = parseCsv(rawCsv);
@@ -131,9 +158,9 @@ router.post("/chat", async (req: Request, res: Response) => {
     const topK = catalogSize < 30 ? catalogSize : 8;
 
     // ── Semantic search — enrich query with last user turn for context ─────
-    const lastUserMsg = safeHistory
-      .filter((m) => m.role === "user")
-      .slice(-1)[0]?.parts[0]?.text ?? "";
+    const lastUserMsg =
+      safeHistory.filter((m) => m.role === "user").slice(-1)[0]?.parts[0]
+        ?.text ?? "";
 
     const searchQuery = lastUserMsg
       ? `${lastUserMsg} ${message.trim()}`
