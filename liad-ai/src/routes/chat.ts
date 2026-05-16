@@ -5,14 +5,17 @@ import { getAccountData, getLatestCsvForAccount } from "../services/firebase-adm
 import {
   buildIndex,
   hasIndex,
+  isIndexBuilding,
   getIndexHash,
   getIndexSize,
   getIndexItems,
   getEmbedding,
   getSemanticScores,
+  getSchemaAnalysis,
   csvHash,
 } from "../services/semantic-search";
 import { Product } from "../services/schema-analysis";
+import { rankProducts } from "../services/hybrid-ranker";
 import fs from "fs";
 import path from "path";
 import { parse } from "csv-parse/sync";
@@ -69,7 +72,7 @@ async function searchProducts(
   accountId: string,
   query: string,
   topK: number
-): Promise<Product[]> {
+): Promise<{ product: Product; score: number }[]> {
   const items = getIndexItems(accountId);
   if (items.length === 0) return [];
 
@@ -78,8 +81,7 @@ async function searchProducts(
 
   return scored
     .sort((a, b) => b.score - a.score)
-    .slice(0, topK)
-    .map((s) => s.product);
+    .slice(0, topK);
 }
 
 // ─── Prompt builder ───────────────────────────────────────────────────────────
@@ -139,23 +141,39 @@ router.post("/chat", async (req: Request, res: Response) => {
 
     const storeName: string = account.storeName ?? "Loja";
 
-    // ── Build/refresh index with hash-based invalidation ──────────────────
+    // ── Build/refresh index in the background ─────────────────────────────
     if (rawCsv) {
       const currentHash = csvHash(rawCsv);
       const needsRebuild =
         !hasIndex(accountId) || getIndexHash(accountId) !== currentHash;
 
-      if (needsRebuild) {
+      if (needsRebuild && !isIndexBuilding(accountId)) {
         const products = parseCsv(rawCsv);
         if (products.length > 0) {
-          await buildIndex(accountId, products, currentHash);
+          buildIndex(accountId, products, currentHash).catch(err =>
+            console.error("[buildIndex background]", err)
+          );
         }
+      }
+
+      // Wait up to 15s for the first batch to land (partial index published per batch)
+      if (!hasIndex(accountId)) {
+        const deadline = Date.now() + 15_000;
+        while (!hasIndex(accountId) && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+
+      if (!hasIndex(accountId)) {
+        res.json({ reply: "..." });
+        return;
       }
     }
 
-    // ── Dynamic topK: small catalogs get everything, large ones get top 8 ─
     const catalogSize = getIndexSize(accountId);
-    const topK = catalogSize < 30 ? catalogSize : 8;
+    // Retrieve a wider candidate set, then rerank to finalTopK for Gemini
+    const searchTopK = catalogSize < 30 ? catalogSize : Math.min(catalogSize, 30);
+    const finalTopK = catalogSize < 30 ? catalogSize : 20;
 
     // ── Semantic search — enrich query with last user turn for context ─────
     const lastUserMsg =
@@ -166,7 +184,13 @@ router.post("/chat", async (req: Request, res: Response) => {
       ? `${lastUserMsg} ${message.trim()}`
       : message.trim();
 
-    const relevantProducts = await searchProducts(accountId, searchQuery, topK);
+    const scoredProducts = await searchProducts(accountId, searchQuery, searchTopK);
+
+    // ── Hybrid rerank: boost in-stock / highly-rated, then take top N ─────
+    const schemaAnalysis = getSchemaAnalysis(accountId);
+    const reranked = rankProducts(scoredProducts, schemaAnalysis);
+    const relevantProducts = reranked.slice(0, finalTopK).map((r) => r.product);
+
     const filteredCsv = productsToPromptCsv(relevantProducts);
 
     // ── Call Gemini with filtered catalog ─────────────────────────────────

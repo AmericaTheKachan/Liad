@@ -21,7 +21,34 @@ export function getAdminApp(): admin.app.App {
   return adminApp;
 }
 
+// ─── CSV in-memory cache ──────────────────────────────────────────────────────
+
+interface CsvCacheEntry {
+  content: string;
+  fetchedAt: number;
+}
+
+const csvMemoryCache = new Map<string, CsvCacheEntry>();
+const CSV_CACHE_TTL_MS = 60_000; // 60 seconds
+
+export function invalidateCsvCache(accountId: string): void {
+  csvMemoryCache.delete(accountId);
+}
+
 export async function getLatestCsvForAccount(accountId: string): Promise<string | null> {
+  const cached = csvMemoryCache.get(accountId);
+  if (cached && Date.now() - cached.fetchedAt < CSV_CACHE_TTL_MS) {
+    return cached.content;
+  }
+
+  const content = await _fetchCsvFromFirebase(accountId);
+  if (content !== null) {
+    csvMemoryCache.set(accountId, { content, fetchedAt: Date.now() });
+  }
+  return content;
+}
+
+async function _fetchCsvFromFirebase(accountId: string): Promise<string | null> {
   const app = getAdminApp();
   const db = admin.firestore(app);
 
@@ -33,21 +60,13 @@ export async function getLatestCsvForAccount(accountId: string): Promise<string 
     .limit(1)
     .get();
 
-  if (snapshot.empty) {
-    return null;
-  }
+  if (snapshot.empty) return null;
 
-  const upload = snapshot.docs[0].data();
-  const storagePath: string = upload.storagePath;
-
-  if (!storagePath) {
-    return null;
-  }
+  const storagePath: string = snapshot.docs[0].data().storagePath;
+  if (!storagePath) return null;
 
   const bucket = admin.storage(app).bucket();
-  const file = bucket.file(storagePath);
-  const [contents] = await file.download();
-
+  const [contents] = await bucket.file(storagePath).download();
   return contents.toString("utf-8");
 }
 

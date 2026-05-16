@@ -32,6 +32,7 @@ interface PersistedIndex {
 const indexes = new Map<string, IndexedProduct[]>();
 const indexHashes = new Map<string, string>();
 const schemaCache = new Map<string, CatalogSchemaAnalysis>();
+const indexBuilding = new Map<string, Promise<void>>();
 
 // ─── Persistence ─────────────────────────────────────────────────────────────
 
@@ -69,6 +70,26 @@ export async function getEmbedding(text: string): Promise<number[]> {
   return result.embedding.values;
 }
 
+// Embeds a batch of texts in a single API call with exponential backoff on 429/5xx.
+async function batchGetEmbeddingsWithRetry(texts: string[], maxRetries = 4): Promise<number[][]> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await getEmbeddingModel().batchEmbedContents({
+        requests: texts.map(text => ({ content: { role: "user", parts: [{ text }] } })),
+      });
+      return result.embeddings.map(e => e.values);
+    } catch (err: any) {
+      const isRateLimit = err?.status === 429 || String(err?.message).includes("429");
+      const isServer = err?.status >= 500;
+      if (attempt === maxRetries || (!isRateLimit && !isServer)) throw err;
+      const delay = Math.pow(2, attempt) * 1500; // 1.5s → 3s → 6s → 12s
+      console.warn(`[semantic-search] Batch embed failed (attempt ${attempt + 1}), retrying in ${delay}ms...`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+  throw new Error("Max embedding retries exceeded");
+}
+
 export function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0, normA = 0, normB = 0;
   for (let i = 0; i < a.length; i++) {
@@ -97,43 +118,97 @@ export function getIndexItems(accountId: string): IndexedProduct[] {
   return indexes.get(accountId) || [];
 }
 
+export function isIndexBuilding(accountId: string): boolean {
+  return indexBuilding.has(accountId);
+}
+
 /**
  * Builds (or rebuilds) the vector index for an account's product list.
- * Utilizes schema analysis and embedding builder for cleaner vectors.
+ * Deduplicates concurrent builds (returns in-progress promise if called again).
+ * Uses batchEmbedContents (1 API call per 100 products) with exponential backoff.
+ * Uses row-level content hashing for incremental updates.
  */
-export async function buildIndex(
+export function buildIndex(
   accountId: string,
   products: Product[],
   hash: string,
   schemaAnalysis?: CatalogSchemaAnalysis
 ): Promise<void> {
-  // 1. Try loading from disk cache
+  const inProgress = indexBuilding.get(accountId);
+  if (inProgress) return inProgress;
+
+  const promise = _doBuildIndex(accountId, products, hash, schemaAnalysis)
+    .finally(() => indexBuilding.delete(accountId));
+
+  indexBuilding.set(accountId, promise);
+  return promise;
+}
+
+async function _doBuildIndex(
+  accountId: string,
+  products: Product[],
+  hash: string,
+  schemaAnalysis?: CatalogSchemaAnalysis
+): Promise<void> {
+  // 1. Exact CSV hash match — load from disk, no work needed
   const cached = loadIndexFromDisk(accountId);
   if (cached && cached.hash === hash) {
     indexes.set(accountId, cached.items);
     indexHashes.set(accountId, hash);
-    if (cached.schemaAnalysis) {
-      schemaCache.set(accountId, cached.schemaAnalysis);
-    }
-    console.log(`[semantic-search] Index loaded from disk for account ${accountId} (${cached.items.length} products)`);
+    if (cached.schemaAnalysis) schemaCache.set(accountId, cached.schemaAnalysis);
+    console.log(`[semantic-search] Index loaded from disk for ${accountId} (${cached.items.length} products)`);
     return;
   }
 
-  // 2. Build fresh index via embedding API
-  console.log(`[semantic-search] Building new index for account ${accountId}...`);
-  const BATCH = 100;
-  const indexed: IndexedProduct[] = [];
+  console.log(`[semantic-search] Updating index for ${accountId} (${products.length} products)...`);
 
-  for (let i = 0; i < products.length; i += BATCH) {
-    const batch = products.slice(i, i + BATCH);
-    const results = await Promise.all(
-      batch.map(async (product) => {
-        const text = buildEmbeddingText(product, schemaAnalysis);
-        const embedding = await getEmbedding(text);
-        return { product, embedding, text };
-      })
-    );
-    indexed.push(...results);
+  const indexed: IndexedProduct[] = new Array(products.length);
+  const BATCH = 100;
+
+  // 2. Incremental path — reuse embeddings for rows whose content hasn't changed
+  if (cached && cached.items.length > 0) {
+    const oldByRowHash = new Map<string, IndexedProduct>();
+    for (const item of cached.items) {
+      const rowHash = crypto.createHash("md5").update(JSON.stringify(item.product)).digest("hex");
+      oldByRowHash.set(rowHash, item);
+    }
+
+    const toEmbed: { product: Product; text: string; pos: number }[] = [];
+
+    for (let i = 0; i < products.length; i++) {
+      const rowHash = crypto.createHash("md5").update(JSON.stringify(products[i])).digest("hex");
+      const existing = oldByRowHash.get(rowHash);
+      if (existing) {
+        indexed[i] = existing;
+      } else {
+        toEmbed.push({ product: products[i], text: buildEmbeddingText(products[i], schemaAnalysis), pos: i });
+      }
+    }
+
+    console.log(`[semantic-search] Incremental: ${products.length - toEmbed.length} reused, ${toEmbed.length} to embed`);
+
+    for (let b = 0; b < toEmbed.length; b += BATCH) {
+      if (b > 0) await new Promise(r => setTimeout(r, 300)); // avoid burst 429
+      const chunk = toEmbed.slice(b, b + BATCH);
+      const embeddings = await batchGetEmbeddingsWithRetry(chunk.map(c => c.text));
+      chunk.forEach(({ product, text, pos }, i) => {
+        indexed[pos] = { product, embedding: embeddings[i], text };
+      });
+    }
+  } else {
+    // 3. Full build from scratch — 1 API call per 100 products.
+    // Partial results are published after each batch so queries work immediately.
+    for (let i = 0; i < products.length; i += BATCH) {
+      if (i > 0) await new Promise(r => setTimeout(r, 300)); // avoid burst 429
+      const chunk = products.slice(i, i + BATCH);
+      const texts = chunk.map(p => buildEmbeddingText(p, schemaAnalysis));
+      const embeddings = await batchGetEmbeddingsWithRetry(texts);
+      chunk.forEach((product, j) => {
+        indexed[i + j] = { product, embedding: embeddings[j], text: texts[j] };
+      });
+      // Publish whatever is indexed so far — hasIndex becomes true after the first batch
+      indexes.set(accountId, (indexed as (IndexedProduct | undefined)[]).filter((x): x is IndexedProduct => x !== undefined));
+    }
   }
 
   indexes.set(accountId, indexed);
@@ -141,7 +216,7 @@ export async function buildIndex(
   if (schemaAnalysis) schemaCache.set(accountId, schemaAnalysis);
 
   saveIndexToDisk(accountId, hash, indexed, schemaAnalysis);
-  console.log(`[semantic-search] Index built for account ${accountId}: ${indexed.length} products`);
+  console.log(`\n✅ [semantic-search] CSV indexing complete for account ${accountId} — ${indexed.length} products fully indexed and ready.\n`);
 }
 
 /**

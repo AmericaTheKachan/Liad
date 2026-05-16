@@ -76,6 +76,16 @@
     <line x1="17" y1="9" x2="23" y2="15"/>
   </svg>`;
 
+  // ─── Placeholder product image ────────────────────────────────────────────
+  const PLACEHOLDER_PRODUCT_IMG = "data:image/svg+xml," + encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="150" viewBox="0 0 320 150">' +
+    '<rect width="320" height="150" fill="#1c1c1c"/>' +
+    '<rect x="128" y="44" width="64" height="62" rx="6" fill="none" stroke="#555" stroke-width="1.5"/>' +
+    '<circle cx="148" cy="65" r="8" fill="none" stroke="#555" stroke-width="1.5"/>' +
+    '<path d="M130 102 L150 78 L163 91 L171 82 L190 102" fill="none" stroke="#555" stroke-width="1.5" stroke-linejoin="round"/>' +
+    '</svg>'
+  );
+
   // ─── Styles ───────────────────────────────────────────────────────────────
   const styles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
@@ -335,10 +345,26 @@
       background: rgba(255,255,255,0.04);
       border: 1px solid rgba(255,255,255,0.09);
       border-radius: 10px;
-      padding: 10px 12px;
       margin: 6px 0;
+      overflow: hidden;
     }
     .liad-msg-bot .liad-product-card:first-child { margin-top: 8px; }
+    .liad-msg-bot .liad-product-img-wrap {
+      width: 100%;
+      height: 110px;
+      overflow: hidden;
+      background: #181818;
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+    }
+    .liad-msg-bot .liad-product-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .liad-msg-bot .liad-product-content {
+      padding: 10px 12px;
+    }
     .liad-msg-bot .liad-product-name {
       font-weight: 600;
       color: #f0f0f0;
@@ -540,8 +566,9 @@
   function renderMarkdown(text) {
     const container = document.createElement("div");
 
-    // Detect product block pattern: "1. **Name**\nR$ price\nDescription\n[Link](url)"
-    const productBlockRegex = /(\d+)\.\s+\*\*(.+?)\*\*\n(R\$\s*[\d.,]+)(?:\n(.+?))?(?:\n\[(.+?)\]\((.+?)\))?(?=\n\d+\.|$)/gs;
+    // Detect product block: optional "N. " prefix, **Name**\nR$ price\nDesc\n[Link](url)
+    // Non-capturing group for the number so match indices stay stable: [1]=name [2]=price [3]=desc [4]=link text [5]=url
+    const productBlockRegex = /(?:\d+\.\s+)?\*\*(.+?)\*\*\n(R\$\s*[\d.,]+)(?:\n([^\n\[*][^\n]*))?(?:\n\[(.+?)\]\((.+?)\))?(?=\n+(?:\d+\.\s+)?\*\*|$)/g;
 
     let hasProductCards = false;
     let lastIndex = 0;
@@ -559,34 +586,50 @@
       const card = document.createElement("div");
       card.className = "liad-product-card";
 
+      // Image
+      const imgWrap = document.createElement("div");
+      imgWrap.className = "liad-product-img-wrap";
+      const img = document.createElement("img");
+      img.className = "liad-product-img";
+      img.src = PLACEHOLDER_PRODUCT_IMG;
+      img.alt = match[1].trim();
+      img.onerror = function () { imgWrap.style.display = "none"; };
+      imgWrap.appendChild(img);
+      card.appendChild(imgWrap);
+
+      // Content
+      const content = document.createElement("div");
+      content.className = "liad-product-content";
+
       const name = document.createElement("div");
       name.className = "liad-product-name";
-      name.textContent = match[2].trim();
+      name.textContent = match[1].trim();
 
       const price = document.createElement("div");
       price.className = "liad-product-price";
-      price.textContent = match[3].trim();
+      price.textContent = match[2].trim();
 
-      card.appendChild(name);
-      card.appendChild(price);
+      content.appendChild(name);
+      content.appendChild(price);
 
-      if (match[4]) {
+      if (match[3]) {
         const desc = document.createElement("div");
         desc.className = "liad-product-desc";
-        desc.textContent = match[4].trim();
-        card.appendChild(desc);
+        desc.textContent = match[3].trim();
+        content.appendChild(desc);
       }
 
-      if (match[5] && match[6]) {
+      if (match[4] && match[5]) {
         const link = document.createElement("a");
         link.className = "liad-product-link";
-        link.href = match[6].trim();
+        link.href = match[5].trim();
         link.target = "_blank";
         link.rel = "noopener noreferrer";
-        link.textContent = match[5].trim();
-        card.appendChild(link);
+        link.textContent = match[4].trim();
+        content.appendChild(link);
       }
 
+      card.appendChild(content);
       container.appendChild(card);
       lastIndex = match.index + match[0].length;
     }
@@ -813,7 +856,7 @@
       ttsBtn.title = "Seu navegador não suporta síntese de voz";
       return {
         isEnabled: () => false,
-        speak: () => {}
+        speak: () => { }
       };
     }
 
@@ -849,8 +892,8 @@
 
       const clean = stripMarkdown(text);
       const utterance = new SpeechSynthesisUtterance(clean);
-      utterance.lang  = "pt-BR";
-      utterance.rate  = 1.05;
+      utterance.lang = "pt-BR";
+      utterance.rate = 1.05;
       utterance.pitch = 1;
 
       const voice = getBestVoice();
@@ -858,7 +901,7 @@
 
       if (msgEl) {
         utterance.onstart = () => msgEl.classList.add("speaking");
-        utterance.onend   = () => msgEl.classList.remove("speaking");
+        utterance.onend = () => msgEl.classList.remove("speaking");
         utterance.onerror = () => msgEl.classList.remove("speaking");
       }
 
@@ -901,8 +944,8 @@
       recognition.interimResults = false;
       recognition.maxAlternatives = 1;
 
-      recognition.onstart  = () => setListening(true);
-      recognition.onend    = () => { setListening(false); recognition = null; };
+      recognition.onstart = () => setListening(true);
+      recognition.onend = () => { setListening(false); recognition = null; };
       recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript.trim();
         if (transcript) onResult(transcript);
