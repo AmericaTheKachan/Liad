@@ -14,14 +14,14 @@ export function getAdminApp(): admin.app.App {
 
     adminApp = admin.initializeApp({
       credential,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     });
   }
 
   return adminApp;
 }
 
-// ─── CSV in-memory cache ──────────────────────────────────────────────────────
+// CSV in-memory cache
 
 interface CsvCacheEntry {
   content: string;
@@ -29,7 +29,17 @@ interface CsvCacheEntry {
 }
 
 const csvMemoryCache = new Map<string, CsvCacheEntry>();
-const CSV_CACHE_TTL_MS = 60_000; // 60 seconds
+const CSV_CACHE_TTL_MS = 10 * 60_000; // 10 minutes
+
+// Account in-memory cache
+
+interface AccountCacheEntry {
+  data: admin.firestore.DocumentData | null;
+  fetchedAt: number;
+}
+
+const accountMemoryCache = new Map<string, AccountCacheEntry>();
+const ACCOUNT_CACHE_TTL_MS = 30 * 60_000; // 30 minutes
 
 export function invalidateCsvCache(accountId: string): void {
   csvMemoryCache.delete(accountId);
@@ -70,10 +80,46 @@ async function _fetchCsvFromFirebase(accountId: string): Promise<string | null> 
   return contents.toString("utf-8");
 }
 
+export async function getAllAccountIds(): Promise<string[]> {
+  const app = getAdminApp();
+  const db = admin.firestore(app);
+  const snapshot = await db.collection("accounts").get();
+  return snapshot.docs.map(doc => doc.id);
+}
+
 export async function getAccountData(accountId: string): Promise<admin.firestore.DocumentData | null> {
+  const cached = accountMemoryCache.get(accountId);
+  if (cached && Date.now() - cached.fetchedAt < ACCOUNT_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const app = getAdminApp();
   const db = admin.firestore(app);
   const doc = await db.collection("accounts").doc(accountId).get();
+  const data = doc.exists ? doc.data() ?? null : null;
 
-  return doc.exists ? doc.data() ?? null : null;
+  accountMemoryCache.set(accountId, { data, fetchedAt: Date.now() });
+  return data;
+}
+
+export async function logConversation(
+  accountId: string,
+  data: {
+    messageCount: number;
+    topProduct: string | null;
+    responseTimeMs: number;
+  }
+): Promise<void> {
+  const app = getAdminApp();
+  const db = admin.firestore(app);
+  await db
+    .collection("accounts")
+    .doc(accountId)
+    .collection("conversations")
+    .add({
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      messageCount: data.messageCount,
+      topProduct: data.topProduct,
+      responseTimeMs: data.responseTimeMs,
+    });
 }

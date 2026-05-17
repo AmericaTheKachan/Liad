@@ -76,16 +76,6 @@
     <line x1="17" y1="9" x2="23" y2="15"/>
   </svg>`;
 
-  // ─── Placeholder product image ────────────────────────────────────────────
-  const PLACEHOLDER_PRODUCT_IMG = "data:image/svg+xml," + encodeURIComponent(
-    '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="150" viewBox="0 0 320 150">' +
-    '<rect width="320" height="150" fill="#1c1c1c"/>' +
-    '<rect x="128" y="44" width="64" height="62" rx="6" fill="none" stroke="#555" stroke-width="1.5"/>' +
-    '<circle cx="148" cy="65" r="8" fill="none" stroke="#555" stroke-width="1.5"/>' +
-    '<path d="M130 102 L150 78 L163 91 L171 82 L190 102" fill="none" stroke="#555" stroke-width="1.5" stroke-linejoin="round"/>' +
-    '</svg>'
-  );
-
   // ─── Styles ───────────────────────────────────────────────────────────────
   const styles = `
     @import url('https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap');
@@ -355,12 +345,9 @@
       overflow: hidden;
       background: #181818;
       border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-    .liad-msg-bot .liad-product-img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
-      display: block;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
     .liad-msg-bot .liad-product-content {
       padding: 10px 12px;
@@ -586,15 +573,9 @@
       const card = document.createElement("div");
       card.className = "liad-product-card";
 
-      // Image
       const imgWrap = document.createElement("div");
       imgWrap.className = "liad-product-img-wrap";
-      const img = document.createElement("img");
-      img.className = "liad-product-img";
-      img.src = PLACEHOLDER_PRODUCT_IMG;
-      img.alt = match[1].trim();
-      img.onerror = function () { imgWrap.style.display = "none"; };
-      imgWrap.appendChild(img);
+      imgWrap.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 64 64" fill="none" style="opacity:0.18"><rect x="8" y="12" width="48" height="40" rx="4" stroke="#aaa" stroke-width="2"/><circle cx="22" cy="26" r="6" stroke="#aaa" stroke-width="2"/><path d="M8 44 L24 30 L35 41 L44 32 L56 44" stroke="#aaa" stroke-width="2" stroke-linejoin="round"/></svg>';
       card.appendChild(imgWrap);
 
       // Content
@@ -1060,7 +1041,13 @@
         typingRow.remove();
         const msgEl = addMessage(reply, "bot");
         tts.speak(reply, msgEl);
-        history.push({ role: "model", parts: [{ text: reply }] });
+        if (data.loading) {
+          // Index is still building — remove the user message from history so
+          // when they retry the question it goes through fresh (not as a duplicate).
+          history.pop();
+        } else {
+          history.push({ role: "model", parts: [{ text: reply }] });
+        }
       } catch {
         typingRow.remove();
         addMessage("Não consegui conectar. Verifique sua conexão e tente novamente.", "bot");

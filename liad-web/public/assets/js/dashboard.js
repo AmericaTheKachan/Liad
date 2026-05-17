@@ -251,6 +251,10 @@ const state = {
   mobileOpen: false,
   metricsFilter: "7d",
   metricsPage: 1,
+  metricsCache: {},
+  metricsLoading: false,
+  metricsError: null,
+  aiUrl: "",
   snippetPlatform: "shopify",
   modalAction: null,
   modalReturnFocus: null,
@@ -787,16 +791,81 @@ function renderDashboardView() {
   `;
 }
 
+async function loadMetrics() {
+  if (state.metricsLoading) return;
+  state.metricsLoading = true;
+  state.metricsError = null;
+  const period = state.metricsFilter;
+  try {
+    const base = state.aiUrl || "http://localhost:3001";
+    const res = await fetch(`${base}/metrics?accountId=${encodeURIComponent(state.accountId)}&period=${period}`);
+    if (!res.ok) throw new Error("Falha ao carregar metricas.");
+    const data = await res.json();
+    state.metricsCache[period] = data;
+  } catch (err) {
+    state.metricsError = (err instanceof Error ? err.message : null) ?? "Erro ao carregar metricas.";
+  } finally {
+    state.metricsLoading = false;
+    if (state.currentRoute === "/metricas") renderCurrentView();
+  }
+}
+
 function renderMetricsView() {
-  const selected = METRIC_DATA[state.metricsFilter];
-  const start = (state.metricsPage - 1) * 10;
-  const pageItems = RECENT_CONVERSATIONS.slice(start, start + 10);
-  const totalPages = Math.ceil(RECENT_CONVERSATIONS.length / 10);
+  const data = state.metricsCache[state.metricsFilter];
+
+  if (state.metricsError && !data) {
+    return `
+      ${renderPageHeader("Metricas de performance")}
+      <article class="${cardClass("grid min-h-[240px] place-items-center p-6 text-center")}">
+        <div>
+          <p class="text-sm text-liad-muted">${escapeHtml(state.metricsError)}</p>
+          <button type="button" data-retry-metrics class="mt-4 inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-liad-text hover:bg-white/[0.08] transition">Tentar novamente</button>
+        </div>
+      </article>
+    `;
+  }
+
+  if (!data) {
+    return `
+      ${renderPageHeader("Metricas de performance", "Carregando dados...")}
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+        ${Array.from({ length: 4 }).map(() => `
+          <article class="${cardClass("p-5")}">
+            <div class="h-2 w-24 rounded-full bg-white/[0.06]"></div>
+            <div class="mt-4 h-8 w-28 rounded-full bg-white/[0.06]"></div>
+            <div class="mt-3 h-2 w-36 rounded-full bg-white/[0.06]"></div>
+          </article>
+        `).join("")}
+      </section>
+    `;
+  }
+
+  const periodLabel = data.period === "today" ? "hoje" : data.period === "7d" ? "ultimos 7 dias" : "ultimos 30 dias";
+  const avgRespSec = data.kpis.avgResponseTimeMs > 0
+    ? `${(data.kpis.avgResponseTimeMs / 1000).toFixed(1)}s`
+    : "—";
+
+  const kpis = [
+    { label: "Total de requisicoes a API", value: data.kpis.totalRequests },
+    { label: "Media de mensagens por requisicao", value: data.kpis.avgMessages, format: "decimal" },
+    { label: "Tempo medio de resposta da IA", value: avgRespSec },
+    { label: "Produto mais consultado", value: data.kpis.topProduct ?? "—" }
+  ];
+
+  const conversations = data.recentConversations ?? [];
+  const perPage = 10;
+  const start = (state.metricsPage - 1) * perPage;
+  const pageItems = conversations.slice(start, start + perPage);
+  const totalPages = Math.max(1, Math.ceil(conversations.length / perPage));
+
+  const maxProductCount = data.topProducts.length > 0
+    ? Math.max(...data.topProducts.map((p) => p.count))
+    : 1;
 
   return `
     ${renderPageHeader(
       "Metricas de performance",
-      `Dados detalhados para acompanhar volume, eficiencia e impacto comercial da IA no periodo ${selected.periodLabel.toLowerCase()}.`,
+      `Dados detalhados para acompanhar volume e eficiencia da IA no periodo ${periodLabel}.`,
       `
         <div class="inline-flex flex-wrap gap-2">
           ${METRIC_FILTERS.map((filter) => `
@@ -816,119 +885,119 @@ function renderMetricsView() {
       `
     )}
 
-    <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-      ${selected.kpis.map((metric) => `
-        <article class="${cardClass("p-5")}">
-          <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">${metric.label}</p>
-          <p class="mt-4 font-display text-[1.8rem] font-extrabold tracking-[-0.05em] text-liad-text">${formatMetricValue(metric)}</p>
-          ${
-            metric.delta
-              ? `
-                <div class="mt-3 inline-flex items-center gap-2 text-xs font-semibold ${metric.delta.tone === "positive" ? "text-emerald-300" : "text-orange-200"}">
-                  <span>${metric.delta.value}</span>
-                  <span class="font-normal text-liad-muted">${metric.delta.note}</span>
-                </div>
-              `
-              : `<p class="mt-3 text-sm leading-6 text-liad-muted">Atualizado conforme o filtro selecionado.</p>`
-          }
-        </article>
-      `).join("")}
-    </section>
-
-    <section class="mt-4 grid gap-4 xl:grid-cols-2">
-      <article class="${cardClass("p-5 sm:p-6")}">
-        <div class="mb-4">
-          <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">Volume diario</p>
-          <h2 class="mt-2 text-lg font-semibold text-liad-text">Conversas por dia</h2>
-          <p class="mt-1 text-sm leading-6 text-liad-muted">Passe o mouse para ver a data e o volume exato.</p>
-        </div>
-        ${buildBarChart({
-          data: selected.volume,
-          color: "rgba(105,156,255,1)",
-          formatter: (value) => `${formatNumber(value)} conversas`,
-          height: 180
-        })}
-      </article>
-
-      <article class="${cardClass("p-5 sm:p-6")}">
-        <div class="mb-4">
-          <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">Conversao</p>
-          <h2 class="mt-2 text-lg font-semibold text-liad-text">Taxa ao longo do tempo</h2>
-          <p class="mt-1 text-sm leading-6 text-liad-muted">Linha suave com area preenchida em baixa opacidade.</p>
-        </div>
-        ${buildLineChart({
-          data: selected.conversion,
-          color: "rgba(204,151,255,1)",
-          fill: "rgba(204,151,255,1)",
-          formatter: (value) => `${formatPercent(value)} de conversao`,
-          height: 180
-        })}
-      </article>
-    </section>
-
-    <article class="${cardClass("mt-4 p-5 sm:p-6")}">
-      <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+    ${data.empty ? `
+      <article class="${cardClass("grid min-h-[240px] place-items-center p-6 text-center")}">
         <div>
-          <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">Historico</p>
-          <h2 class="mt-2 text-lg font-semibold text-liad-text">Conversas recentes</h2>
+          <p class="text-lg font-semibold text-liad-text">Nenhuma conversa registrada</p>
+          <p class="mt-2 max-w-md text-sm leading-7 text-liad-muted">As metricas aparecerao aqui assim que os primeiros clientes interagirem com a LIAD na sua loja.</p>
         </div>
-        <p class="text-sm text-liad-muted">Paginacao simples com 10 registros por pagina.</p>
-      </div>
+      </article>
+    ` : `
+      <section class="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+        ${kpis.map((metric) => `
+          <article class="${cardClass("p-5")}">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">${metric.label}</p>
+            <p class="mt-4 font-display text-[1.8rem] font-extrabold tracking-[-0.05em] text-liad-text">${formatMetricValue(metric)}</p>
+            <p class="mt-3 text-sm leading-6 text-liad-muted">Atualizado conforme o filtro selecionado.</p>
+          </article>
+        `).join("")}
+      </section>
 
-      <div class="overflow-x-auto">
-        <table class="min-w-[760px] w-full border-collapse">
-          <thead>
-            <tr class="border-b border-white/10 text-left text-[11px] uppercase tracking-[0.16em] text-liad-muted">
-              <th class="px-3 py-3 font-medium">ID da conversa</th>
-              <th class="px-3 py-3 font-medium">Data/hora</th>
-              <th class="px-3 py-3 font-medium">Duracao</th>
-              <th class="px-3 py-3 font-medium">Mensagens</th>
-              <th class="px-3 py-3 font-medium">Converteu?</th>
-              <th class="px-3 py-3 font-medium">Produto consultado</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${pageItems.map((row) => `
-              <tr class="border-b border-white/6 text-sm text-liad-text transition hover:bg-white/[0.03]">
-                <td class="px-3 py-4">${row.id}</td>
-                <td class="px-3 py-4">${row.date}</td>
-                <td class="px-3 py-4">${row.duration}</td>
-                <td class="px-3 py-4">${row.messages}</td>
-                <td class="px-3 py-4">
-                  <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ${row.converted ? "bg-emerald-400/12 text-emerald-300" : "bg-orange-400/12 text-orange-200"}">
-                    ${row.converted ? "Sim" : "Nao"}
-                  </span>
-                </td>
-                <td class="px-3 py-4">${row.product}</td>
-              </tr>
-            `).join("")}
-          </tbody>
-        </table>
-      </div>
+      <section class="mt-4 grid gap-4 xl:grid-cols-2">
+        <article class="${cardClass("p-5 sm:p-6")}">
+          <div class="mb-4">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">Volume diario</p>
+            <h2 class="mt-2 text-lg font-semibold text-liad-text">Requisicoes por periodo</h2>
+            <p class="mt-1 text-sm leading-6 text-liad-muted">Passe o mouse para ver o volume exato.</p>
+          </div>
+          ${data.volume.length > 1 ? buildBarChart({
+            data: data.volume,
+            color: "rgba(105,156,255,1)",
+            formatter: (value) => `${formatNumber(value)} requisicoes`,
+            height: 180
+          }) : `<p class="text-sm text-liad-muted py-8 text-center">Dados insuficientes para o grafico.</p>`}
+        </article>
 
-      <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <p class="text-sm text-liad-muted">Pagina ${state.metricsPage} de ${totalPages}</p>
-        <div class="flex gap-2">
-          <button
-            type="button"
-            data-page="prev"
-            ${state.metricsPage === 1 ? "disabled" : ""}
-            class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Anterior
-          </button>
-          <button
-            type="button"
-            data-page="next"
-            ${state.metricsPage === totalPages ? "disabled" : ""}
-            class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            Proxima
-          </button>
+        <article class="${cardClass("p-5 sm:p-6")}">
+          <div class="mb-4">
+            <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">Ranking</p>
+            <h2 class="mt-2 text-lg font-semibold text-liad-text">Produtos mais consultados</h2>
+            <p class="mt-1 text-sm leading-6 text-liad-muted">Top produtos puxados pela LIAD no periodo.</p>
+          </div>
+          ${data.topProducts.length > 0 ? `
+            <div class="grid gap-4">
+              ${data.topProducts.map((product) => `
+                <div class="grid gap-2">
+                  <div class="flex items-center justify-between gap-4 text-sm">
+                    <strong class="font-medium text-liad-text">${escapeHtml(product.name)}</strong>
+                    <span class="text-liad-muted">${formatNumber(product.count)} consultas</span>
+                  </div>
+                  <div class="h-2 rounded-full bg-white/6">
+                    <span class="block h-2 rounded-full bg-gradient-to-r from-liad-violet to-liad-blue" style="width:${(product.count / maxProductCount) * 100}%"></span>
+                  </div>
+                </div>
+              `).join("")}
+            </div>
+          ` : `<p class="text-sm text-liad-muted py-8 text-center">Nenhum produto identificado ainda.</p>`}
+        </article>
+      </section>
+
+      <article class="${cardClass("mt-4 p-5 sm:p-6")}">
+        <div class="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p class="text-[11px] uppercase tracking-[0.2em] text-liad-muted">Historico</p>
+            <h2 class="mt-2 text-lg font-semibold text-liad-text">Requisicoes recentes</h2>
+          </div>
+          <p class="text-sm text-liad-muted">Pagina ${state.metricsPage} de ${totalPages}</p>
         </div>
-      </div>
-    </article>
+
+        ${conversations.length > 0 ? `
+          <div class="overflow-x-auto">
+            <table class="min-w-[680px] w-full border-collapse">
+              <thead>
+                <tr class="border-b border-white/10 text-left text-[11px] uppercase tracking-[0.16em] text-liad-muted">
+                  <th class="px-3 py-3 font-medium">ID</th>
+                  <th class="px-3 py-3 font-medium">Data/hora</th>
+                  <th class="px-3 py-3 font-medium">Mensagens</th>
+                  <th class="px-3 py-3 font-medium">Tempo de resp.</th>
+                  <th class="px-3 py-3 font-medium">Produto consultado</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${pageItems.map((row) => `
+                  <tr class="border-b border-white/6 text-sm text-liad-text transition hover:bg-white/[0.03]">
+                    <td class="px-3 py-4 font-mono text-xs">${escapeHtml(row.id)}</td>
+                    <td class="px-3 py-4">${escapeHtml(row.date)}</td>
+                    <td class="px-3 py-4">${row.messages}</td>
+                    <td class="px-3 py-4">${escapeHtml(row.responseTime)}</td>
+                    <td class="px-3 py-4">${escapeHtml(row.product)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="mt-4 flex justify-end gap-2">
+            <button
+              type="button"
+              data-page="prev"
+              ${state.metricsPage === 1 ? "disabled" : ""}
+              class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+            >Anterior</button>
+            <button
+              type="button"
+              data-page="next"
+              ${state.metricsPage >= totalPages ? "disabled" : ""}
+              class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08] disabled:cursor-not-allowed disabled:opacity-40"
+            >Proxima</button>
+          </div>
+        ` : `<p class="text-sm text-liad-muted py-4 text-center">Nenhuma requisicao registrada neste periodo.</p>`}
+      </article>
+    `}
   `;
+
+  // dead-code reference kept intentionally — mock constants below still exist
+  void METRIC_DATA; void RECENT_CONVERSATIONS;
 }
 
 function renderApiKeyCard() {
@@ -2081,8 +2150,12 @@ function renderCurrentView() {
       elements.viewRoot.querySelector("[data-products-mount]"),
       state.accountId,
       openModal
-  );
-}
+    );
+  }
+
+  if (state.currentRoute === "/metricas" && !state.metricsLoading && !state.metricsCache[state.metricsFilter] && !state.metricsError) {
+    loadMetrics();
+  }
 
   bindViewInteractions();
   bindChartTooltips();
@@ -2119,8 +2192,16 @@ function bindChartTooltips() {
 }
 
 function bindViewInteractions() {
+  elements.viewRoot.querySelectorAll("[data-retry-metrics]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.metricsError = null;
+      loadMetrics();
+    });
+  });
+
   elements.viewRoot.querySelectorAll("[data-filter]").forEach((button) => {
     button.addEventListener("click", () => {
+      if (state.metricsFilter === button.dataset.filter) return;
       state.metricsFilter = button.dataset.filter;
       state.metricsPage = 1;
       renderCurrentView();
@@ -2129,7 +2210,8 @@ function bindViewInteractions() {
 
   elements.viewRoot.querySelectorAll("[data-page]").forEach((button) => {
     button.addEventListener("click", () => {
-      const maxPage = Math.ceil(RECENT_CONVERSATIONS.length / 10);
+      const conversations = state.metricsCache[state.metricsFilter]?.recentConversations ?? [];
+      const maxPage = Math.max(1, Math.ceil(conversations.length / 10));
       state.metricsPage =
         button.dataset.page === "prev"
           ? Math.max(1, state.metricsPage - 1)
@@ -2600,6 +2682,14 @@ function bindShellEvents() {
 }
 
 async function init() {
+  try {
+    const configRes = await fetch("/api/firebase-config");
+    const configData = await configRes.json();
+    state.aiUrl = configData.aiUrl ?? "http://localhost:3001";
+  } catch {
+    state.aiUrl = "http://localhost:3001";
+  }
+
   const user = await requireAuthenticated();
   const context = await getCurrentAccountContext(user);
 
