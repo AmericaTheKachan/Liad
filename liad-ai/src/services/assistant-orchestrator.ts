@@ -1,6 +1,6 @@
 import { ChatMessage } from "../utils/gemini-client";
 import { extractProductName } from "../utils/csv-utils";
-import { extractIntent } from "./intent-extractor";
+import { rewriteQuery } from "./query-rewriter";
 import { filterProducts } from "./metadata-filter";
 import {
   getAllProducts,
@@ -18,59 +18,12 @@ export interface OrchestratorResult {
 }
 
 /**
- * When the current search query is short (a follow-up like "HeadSet game"),
- * prepend meaningful terms from the last 2 user messages in history so that
- * brand/product context established earlier is not lost.
- *
- * Example:
- *   history user[-2]: "Tem algum produto JBL?"
- *   current query:    "HeadSet game"
- *   enriched query:   "JBL HeadSet game"
- */
-function enrichQueryWithHistory(currentQuery: string, history: ChatMessage[]): string {
-  // Only enrich short queries -- a long, specific query is already self-contained
-  const wordCount = currentQuery.trim().split(/\s+/).length;
-  if (wordCount > 4) return currentQuery;
-
-  // Collect the last 2 user turns from history
-  const recentUserTexts = history
-    .filter(m => m.role === "user")
-    .slice(-2)
-    .map(m => (m.parts[0]?.text ?? "").trim())
-    .filter(t => t.length > 0);
-
-  if (recentUserTexts.length === 0) return currentQuery;
-
-  // Extract candidate terms: words >=2 chars that are not pure numbers
-  // and that are NOT already present in the current query (case-insensitive)
-  const currentLower = new Set(currentQuery.toLowerCase().split(/\s+/));
-  const extraTerms: string[] = [];
-
-  for (const text of recentUserTexts) {
-    for (const word of text.split(/\s+/)) {
-      const clean = word.replace(/[^a-zA-Z0-9]/g, "").trim();
-      if (
-        clean.length >= 2 &&
-        !/^\d+$/.test(clean) &&
-        !currentLower.has(clean.toLowerCase())
-      ) {
-        extraTerms.push(clean);
-        currentLower.add(clean.toLowerCase()); // deduplicate
-      }
-    }
-  }
-
-  if (extraTerms.length === 0) return currentQuery;
-  return `${extraTerms.join(" ")} ${currentQuery}`;
-}
-
-/**
  * RAG pipeline for a single chat turn:
- *   extractIntent (rule-based, sync, no Gemini)
+ *   rewriteQuery (Gemini Flash Lite -- understands context, typos, follow-ups)
  *   -> filterProducts (hard metadata constraints)
  *   -> hybridSearch (BM25 + vector, falls back gracefully)
  *   -> rankProducts (metadata nudges: stock, rating, popularity)
- *   -> generateRecommendation (the single Gemini call per request)
+ *   -> generateRecommendation (Gemini Flash -- final response)
  */
 export async function processChatRequest(
   accountId: string,
@@ -82,14 +35,25 @@ export async function processChatRequest(
 
   const categories = getCatalogCategories(accountId);
 
-  // 1. Extract intent -- synchronous, rule-based, no Gemini call
-  console.log(`[orchestrator] Extracting intent for: "${userMessage}"`);
-  const intent = extractIntent(userMessage);
+  // 1. Rewrite query -- Gemini Flash Lite understands context, typos, follow-ups
+  //    Falls back to rule-based extractIntent on failure
+  console.log(`[orchestrator] Rewriting query for: "${userMessage}"`);
+  const intent = await rewriteQuery(userMessage, history);
 
   // For non-shopping queries, pass a catalog sample so Gemini has context
   if (!intent.isShoppingIntent) {
     const sample = getCatalogSample(accountId, 20);
     console.log(`[orchestrator] Non-shopping intent -- catalog sample (${sample.length} products)`);
+    const reply = await generateRecommendation(storeName, userMessage, intent, sample, history, categories);
+    return { reply, topProduct: null };
+  }
+
+  // For vague intent queries (e.g. "presente para minha mae", "algo para casa"),
+  // skip the search entirely and let Gemini ask one focused clarifying question.
+  // We pass a diverse catalog sample so Gemini knows what categories are available.
+  if (intent.needsClarification) {
+    const sample = getCatalogSample(accountId, 20);
+    console.log(`[orchestrator] Clarification needed -- skipping search, passing catalog sample (${sample.length} products)`);
     const reply = await generateRecommendation(storeName, userMessage, intent, sample, history, categories);
     return { reply, topProduct: null };
   }
@@ -111,15 +75,22 @@ export async function processChatRequest(
   const topK = catalogSize < 30 ? catalogSize : 20;
 
   // 4. Hybrid search: BM25 + semantic vector
-  // Enrich the query with context from recent history when the current message is a short follow-up
-  const enrichedQuery = enrichQueryWithHistory(intent.searchQuery, history);
-  if (enrichedQuery !== intent.searchQuery) {
-    console.log(`[orchestrator] Query enriched from history: "${intent.searchQuery}" -> "${enrichedQuery}"`);
-  }
-  console.log(`[orchestrator] Hybrid search: "${enrichedQuery}" across ${candidates.length} candidates (topK=${topK})`);
-  const searchResults = await hybridSearch(accountId, enrichedQuery, candidates, topK);
+  console.log(`[orchestrator] Hybrid search: "${intent.searchQuery}" across ${candidates.length} candidates (topK=${topK})`);
+  const searchResults = await hybridSearch(accountId, intent.searchQuery, candidates, topK);
 
+  // 4b. Fallback when keyword search finds nothing but filters are active.
+  //     Show filter-matched candidates so Gemini has something real to work with.
   if (searchResults.length === 0) {
+    const hasFilters = Object.keys(intent.filters).length > 0;
+
+    if (hasFilters) {
+      const fallback = candidates.slice(0, topK);
+      console.log(`[orchestrator] No keyword match -- using ${fallback.length} filter-matched products`);
+      const reply = await generateRecommendation(storeName, userMessage, intent, fallback, history, categories);
+      const topProduct = fallback[0] != null ? extractProductName(fallback[0]) : null;
+      return { reply, topProduct };
+    }
+
     console.log(`[orchestrator] No results for "${intent.searchQuery}" -- product not in catalog`);
     const reply = await generateRecommendation(storeName, userMessage, intent, [], history, categories);
     return { reply, topProduct: null };
@@ -134,7 +105,7 @@ export async function processChatRequest(
   const ranked = rankProducts(scored, schemaAnalysis);
   const finalProducts = ranked.map(r => r.product);
 
-  // 6. Generate response -- the single Gemini call per shopping request
+  // 6. Generate response -- Gemini Flash with ranked product catalog
   console.log(`[orchestrator] Generating response with ${finalProducts.length} products`);
   const reply = await generateRecommendation(storeName, userMessage, intent, finalProducts, history, categories);
 

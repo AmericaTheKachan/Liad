@@ -12,6 +12,7 @@ export interface ShoppingIntent {
     [key: string]: string | number | undefined;
   };
   isShoppingIntent: boolean;
+  needsClarification?: boolean;
 }
 
 // Non-shopping patterns
