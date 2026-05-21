@@ -1,37 +1,73 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="selection:bg-liad-purple/30">
 <head>
   <meta charset="UTF-8">
-  <title>Privacidade - LIAD</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Política de Privacidade - LIAD</title>
   <link rel="stylesheet" href="/assets/css/global.css">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-liad-bg text-liad-text font-body">
+<body class="bg-liad-bg text-liad-text font-body min-h-screen liad-bg-page-flow">
 
-  <div class="max-w-4xl mx-auto p-10">
-    <h1 class="text-4xl font-bold mb-6">Política de Privacidade</h1>
+  <div class="max-w-3xl mx-auto px-6 py-16 sm:py-24">
+    
+    <header class="mb-12 border-b border-white/10 pb-8">
+      <h1 class="text-4xl sm:text-5xl font-extrabold font-display tracking-tight bg-gradient-to-r from-white to-liad-muted bg-clip-text text-transparent mb-4">
+        Política de Privacidade
+      </h1>
+      <p class="text-liad-muted text-lg">
+        Compromisso ético com a segurança dos dados do catálogo dos lojistas e com as interações dos consumidores em conformidade com a LGPD.
+      </p>
+    </header>
 
-    <p class="text-liad-muted mb-4">
-      Sua privacidade é importante para nós.
-    </p>
+    <main class="space-y-6">
+      
+      <section class="liad-surface-soft border border-white/[0.06] rounded-2xl p-6 sm:p-8 shadow-panel backdrop-blur-sm">
+        <div class="flex items-start gap-4">
+          <div class="w-2 h-2 rounded-full bg-liad-blue mt-2.5 shrink-0 shadow-[0_0_12px_rgba(105,156,255,0.8)]"></div>
+          <div>
+            <h2 class="text-xl font-bold font-display text-white mb-2">Processamento de Entradas de Voz e Texto</h2>
+            <p class="text-liad-muted leading-relaxed">
+              Para viabilizar a acessibilidade digital e as diretrizes WCAG do W3C, a LIAD processa comandos em linguagem natural através de texto e áudio (Speech-to-Text). Esses fluxos são convertidos estritamente para extração de entidades analíticas (como faixas de preços, categorias e preferências), sem armazenamento de registros biométricos de voz identificáveis de maneira perene.
+            </p>
+          </div>
+        </div>
+      </section>
 
-    <h2 class="text-2xl mt-8 mb-2">Coleta de dados</h2>
-    <p class="text-liad-muted">
-      Coletamos apenas dados necessários para funcionamento da plataforma.
-    </p>
+      <section class="liad-surface-soft border border-white/[0.06] rounded-2xl p-6 sm:p-8 shadow-panel backdrop-blur-sm">
+        <div class="flex items-start gap-4">
+          <div class="w-2 h-2 rounded-full bg-liad-purple mt-2.5 shrink-0 shadow-[0_0_12px_rgba(204,151,255,0.8)]"></div>
+          <div>
+            <h2 class="text-xl font-bold font-display text-white mb-2">Isolamento Estrito de Dados entre Lojistas</h2>
+            <p class="text-liad-muted leading-relaxed">
+              Todos os catálogos de produtos integrados via upload de CSV, webhooks JSON ou API, bem como o histórico de interações com os clientes de uma loja parceira, são protegidos sob mecanismos rígidos de isolamento lógico. Não há hipótese de cruzamento de dados, vazamentos estruturais de acervos ou concorrência de inteligência analítica entre as contas cadastradas.
+            </p>
+          </div>
+        </div>
+      </section>
 
-    <h2 class="text-2xl mt-8 mb-2">Uso das informações</h2>
-    <p class="text-liad-muted">
-      Utilizamos os dados para melhorar a experiência do usuário.
-    </p>
+      <section class="liad-surface-soft border border-white/[0.06] rounded-2xl p-6 sm:p-8 shadow-panel backdrop-blur-sm">
+        <div class="flex items-start gap-4">
+          <div class="w-2 h-2 rounded-full bg-liad-success mt-2.5 shrink-0 shadow-[0_0_12px_rgba(52,211,153,0.8)]"></div>
+          <div>
+            <h2 class="text-xl font-bold font-display text-white mb-2">Segurança e Criptografia em Trânsito</h2>
+            <p class="text-liad-muted leading-relaxed">
+              Toda a comunicação estabelecida entre o Widget inserido na ponta do cliente final, o portal corporativo do lojista e a nossa API de recomendação trafega exclusivamente sob protocolos HTTPS com camadas TLS válidas, impedindo interceptações externas desautorizadas.
+            </p>
+          </div>
+        </div>
+      </section>
 
-    <h2 class="text-2xl mt-8 mb-2">Segurança</h2>
-    <p class="text-liad-muted">
-      Seus dados são protegidos com boas práticas de segurança.
-    </p>
+    </main>
 
-    <a href="/" class="text-liad-purple mt-10 inline-block">← Voltar</a>
+    <footer class="mt-12 pt-6 border-t border-white/[0.06] flex justify-between items-center text-sm text-liad-muted">
+      <span>Conformidade com a LGPD e Práticas WCAG</span>
+      <a href="/" class="text-liad-purple hover:text-white transition-colors duration-200 flex items-center gap-1 font-medium">
+        <span>←</span> Voltar para a Home
+      </a>
+    </footer>
+
   </div>
 
 </body>

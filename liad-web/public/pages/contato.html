@@ -1,27 +1,63 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="selection:bg-liad-purple/30">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Contato - LIAD</title>
   <link rel="stylesheet" href="/assets/css/global.css">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-liad-bg text-liad-text font-body">
+<body class="bg-liad-bg text-liad-text font-body min-h-screen liad-bg-page-flow">
 
-  <div class="max-w-4xl mx-auto p-10">
-    <h1 class="text-4xl font-bold mb-6">Contato</h1>
+  <div class="max-w-xl mx-auto px-6 py-16 sm:py-24">
+    
+    <header class="mb-10 text-center">
+      <h1 class="text-4xl font-extrabold font-display tracking-tight bg-gradient-to-r from-white to-liad-muted bg-clip-text text-transparent mb-3">
+        Fale Conosco
+      </h1>
+      <p class="text-liad-muted">
+        Dúvidas sobre a integração do Widget ou interesse em revolucionar o motor de busca do seu e-commerce? Fale com a equipe LIAD.
+      </p>
+    </header>
 
-    <p class="text-liad-muted mb-6">
-      Entre em contato com a equipe LIAD.
-    </p>
+    <main class="liad-surface-soft border border-white/[0.06] rounded-2xl p-6 sm:p-8 shadow-panel backdrop-blur-sm">
+      <form action="#" method="POST" class="space-y-5">
+        
+        <div>
+          <label class="block text-sm font-medium text-white mb-2 font-display">Nome ou Organização</label>
+          <input type="text" name="name" placeholder="Ex: Carlos Mendes - Loja Virtual" class="liad-input" required>
+        </div>
 
-    <div class="space-y-4">
-      <p>Email: contato@liad.com.br</p>
-      <p>Telefone: (11) 99999-9999</p>
-    </div>
+        <div>
+          <label class="block text-sm font-medium text-white mb-2 font-display">E-mail de Contato / Corporativo</label>
+          <input type="email" name="email" placeholder="seuemail@empresa.com" class="liad-input" required>
+        </div>
 
-    <a href="/" class="text-liad-purple mt-10 inline-block">← Voltar</a>
+        <div>
+          <label class="block text-sm font-medium text-white mb-2 font-display">Mensagem / Solicitação de Suporte</label>
+          <textarea name="message" rows="4" placeholder="Descreva sua dúvida técnica sobre a API ou integração..." class="liad-input resize-none" required></textarea>
+        </div>
+
+        <button type="submit" class="w-full bg-gradient-to-r from-liad-violet to-liad-purple text-liad-bg font-bold font-display py-3 px-4 rounded-2xl hover:opacity-90 shadow-glow transition-all duration-200 mt-2">
+          Enviar Mensagem
+        </button>
+
+      </form>
+    </main>
+
+    <footer class="mt-10 text-center space-y-4 text-sm text-liad-muted">
+      <div>
+        <p>Desenvolvido por alunos de Engenharia de Software</p>
+        <p class="text-white/40 text-xs mt-1">Pontifícia Universidade Católica de Campinas — 2026</p>
+      </div>
+      <div class="pt-4 border-t border-white/[0.06]">
+        <a href="/" class="text-liad-purple hover:text-white transition-colors duration-200 inline-flex items-center gap-1 font-medium">
+          <span>←</span> Voltar para a Home
+        </a>
+      </div>
+    </footer>
+
   </div>
 
 </body>

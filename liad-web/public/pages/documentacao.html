@@ -1,37 +1,146 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="selection:bg-liad-purple/30">
 <head>
   <meta charset="UTF-8">
-  <title>Documentação - LIAD</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Documentação Técnica - LIAD</title>
   <link rel="stylesheet" href="/assets/css/global.css">
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
-<body class="bg-liad-bg text-liad-text font-body">
+<body class="bg-liad-bg text-liad-text font-body min-h-screen liad-bg-page-flow lg:flex">
 
-  <div class="max-w-4xl mx-auto p-10">
-    <h1 class="text-4xl font-bold mb-6">Documentação</h1>
+  <aside class="lg:w-64 lg:fixed lg:inset-y-0 lg:left-0 bg-liad-panel/40 border-b lg:border-b-0 lg:border-r border-white/10 p-6 backdrop-blur-md z-10">
+    <div class="mb-8">
+      <span class="font-display font-black text-2xl tracking-wider bg-gradient-to-r from-white to-liad-purple bg-clip-text text-transparent">LIAD_</span>
+      <p class="text-xs text-liad-muted mt-1 font-display tracking-widest uppercase">Docs da API</p>
+    </div>
+    <nav class="space-y-2 text-sm">
+      <a href="#introducao" class="block text-white hover:text-liad-purple transition-colors py-1.5 font-medium">Introdução</a>
+      <a href="#autenticacao" class="block text-liad-muted hover:text-white transition-colors py-1.5">Autenticação (RF14)</a>
+      <a href="#widget" class="block text-liad-muted hover:text-white transition-colors py-1.5">Widget Inline (RF15)</a>
+      <a href="#endpoints" class="block text-liad-muted hover:text-white transition-colors py-1.5 font-medium pt-2 border-t border-white/5">Endpoints</a>
+      <a href="#import-csv" class="block text-liad-muted hover:text-white transition-colors py-1.5 pl-3 border-l border-white/10">POST /catalog/csv</a>
+      <a href="#import-json" class="block text-liad-muted hover:text-white transition-colors py-1.5 pl-3 border-l border-white/10">POST /catalog/json</a>
+      <a href="#recommendations" class="block text-liad-muted hover:text-white transition-colors py-1.5 pl-3 border-l border-white/10">POST /recommend</a>
+      <a href="#performance" class="block text-liad-muted hover:text-white transition-colors py-1.5 font-medium pt-2 border-t border-white/5">Métricas (RNF)</a>
+    </nav>
+  </aside>
 
-    <p class="text-liad-muted mb-6">
-      Guia básico de uso da plataforma LIAD.
-    </p>
+  <div class="lg:pl-64 flex-1">
+    <main class="max-w-4xl mx-auto px-6 py-12 lg:py-20 space-y-16">
+      
+      <header id="introducao" class="border-b border-white/10 pb-8">
+        <h1 class="text-4xl lg:text-5xl font-extrabold font-display tracking-tight bg-gradient-to-r from-white to-liad-muted bg-clip-text text-transparent mb-4">
+          Documentação do Desenvolvedor
+        </h1>
+        <p class="text-liad-muted text-lg leading-relaxed">
+          Bem-vindo à API de referência da LIAD. Integre nossa IA de processamento de linguagem natural ao seu e-commerce para criar uma experiência de venda guiada e acessível por voz e texto.
+        </p>
+      </header>
 
-    <h2 class="text-2xl mt-6 mb-2">1. Cadastro</h2>
-    <p class="text-liad-muted">
-      Crie uma conta utilizando seu e-mail.
-    </p>
+      <section id="autenticacao" class="space-y-4">
+        <h2 class="text-2xl font-bold font-display text-white flex items-center gap-2">
+          <span class="text-liad-purple">#</span> Autenticação via API Key
+        </h2>
+        <p class="text-liad-muted leading-relaxed">
+          Conforme especificado no requisito <span class="text-white font-mono text-sm bg-white/5 px-1.5 py-0.5 rounded">RF14</span>, todas as requisições enviadas para a nossa API pública precisam conter a chave única do lojista incluída nos headers HTTP de autorização. Requisições malformadas retornarão <code class="text-liad-orange font-mono">HTTP 401 Unauthorized</code>.
+        </p>
+        <div class="liad-card-panel bg-black/20 font-mono text-xs text-liad-blue p-4 overflow-x-auto">
+          Authorization: Bearer seu_token_liad_aqui
+        </div>
+      </section>
 
-    <h2 class="text-2xl mt-6 mb-2">2. Integração</h2>
-    <p class="text-liad-muted">
-      Adicione o script da LIAD no seu site.
-    </p>
+      <section id="widget" class="space-y-4">
+        <h2 class="text-2xl font-bold font-display text-white flex items-center gap-2">
+          <span class="text-liad-blue">#</span> Integração do Widget (RF15)
+        </h2>
+        <p class="text-liad-muted leading-relaxed">
+          Para habilitar a interface de chat responsiva com suporte a Text-to-Speech (Acessibilidade) diretamente na sua vitrine virtual, copie e cole o script abaixo antes do fechamento da tag <code class="text-liad-blue">&lt;/body&gt;</code>:
+        </p>
+        <pre class="bg-black/40 border border-white/10 rounded-2xl p-5 font-mono text-xs text-emerald-400 overflow-x-auto shadow-inner"><code>&lt;!-- LIAD Widget Script --&gt;
+&lt;script 
+  src="https://cdn.liad.ai/widget.js" 
+  data-key="sua_api_key_aqui"
+  defer&gt;
+&lt;/script&gt;</code></pre>
+      </section>
 
-    <h2 class="text-2xl mt-6 mb-2">3. Uso</h2>
-    <p class="text-liad-muted">
-      A IA começará a atender automaticamente seus clientes.
-    </p>
+      <section id="endpoints" class="space-y-10">
+        <h2 class="text-3xl font-extrabold font-display text-white">Endpoints da API</h2>
 
-    <a href="/" class="text-liad-purple mt-10 inline-block">← Voltar</a>
+        <div class="liad-surface-soft border border-white/[0.06] rounded-2xl p-6 shadow-panel backdrop-blur-sm space-y-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="bg-emerald-500/10 text-emerald-400 font-mono font-bold text-xs px-2.5 py-1 rounded border border-emerald-500/20">POST</span>
+            <code class="text-white font-mono text-sm">/v1/catalog/csv</code>
+            <span class="text-xs text-liad-muted ml-auto font-mono">RF12 - Schema Validator</span>
+          </div>
+          <p class="text-liad-muted text-sm">
+            Permite a ingestão em massa e atualização do catálogo da loja via arquivo CSV estruturado. O motor valida o schema e processa as atualizações em até 5 minutos.
+          </p>
+          <div class="bg-black/30 p-4 rounded-xl font-mono text-xs text-liad-muted">
+            <span class="text-white font-bold">Content-Type:</span> multipart/form-data
+          </div>
+        </div>
+
+        <div class="liad-surface-soft border border-white/[0.06] rounded-2xl p-6 shadow-panel backdrop-blur-sm space-y-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="bg-emerald-500/10 text-emerald-400 font-mono font-bold text-xs px-2.5 py-1 rounded border border-emerald-500/20">POST</span>
+            <code class="text-white font-mono text-sm">/v1/catalog/json</code>
+            <span class="text-xs text-liad-muted ml-auto font-mono">RF13 - Webhook Sync</span>
+          </div>
+          <p class="text-liad-muted text-sm">
+            Sincronização em tempo real via objetos JSON para ferramentas ou ERPs externos integrados pelo desenvolvedor.
+          </p>
+          <pre class="bg-black/30 p-4 rounded-xl font-mono text-xs text-purple-300 overflow-x-auto"><code>{
+  "products": [
+    { "id": "1092", "name": "Notebook Pro", "price": 4500.00, "category": "Informática" }
+  ]
+}</code></pre>
+        </div>
+
+        <div class="liad-surface-soft border border-white/[0.06] rounded-2xl p-6 shadow-panel backdrop-blur-sm space-y-4">
+          <div class="flex flex-wrap items-center gap-3">
+            <span class="bg-emerald-500/10 text-emerald-400 font-mono font-bold text-xs px-2.5 py-1 rounded border border-emerald-500/20">POST</span>
+            <code class="text-white font-mono text-sm">/v1/recommend</code>
+            <span class="text-xs text-liad-muted ml-auto font-mono">RF07 / RF08</span>
+          </div>
+          <p class="text-liad-muted text-sm">
+            Endpoint consumido pela interface para interpretar a linguagem natural do usuário final (texto ou voz processada) e retornar uma lista ranqueada de 1 a 5 produtos acompanhados por justificativa descritiva.
+          </p>
+          <pre class="bg-black/30 p-4 rounded-xl font-mono text-xs text-liad-text overflow-x-auto"><code>// Request Payload
+{
+  "prompt": "Quero um computador bom para estudar engenharia de software até 5000 reais"
+}</code></pre>
+        </div>
+      </section>
+
+      <section id="performance" class="space-y-4 border-t border-white/10 pt-10">
+        <h2 class="text-2xl font-bold font-display text-white flex items-center gap-2">
+          <span class="text-liad-orange">#</span> Acordo de Nível de Serviço e Performance (RNF)
+        </h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div class="p-4 bg-liad-panel/40 border border-white/5 rounded-xl">
+            <p class="liad-card-label">Latência da Recomendação</p>
+            <p class="text-2xl font-bold text-white font-display mt-1">&lt; 800 ms</p>
+            <p class="text-xs text-liad-muted mt-1">Percentil p95 em operação normal (RNF01)</p>
+          </div>
+          <div class="p-4 bg-liad-panel/40 border border-white/5 rounded-xl">
+            <p class="liad-card-label">Síntese de Voz (TTS)</p>
+            <p class="text-2xl font-bold text-white font-display mt-1">&lt; 2.0 segundos</p>
+            <p class="text-xs text-liad-muted mt-1">Geração de áudio para acessibilidade (RNF02)</p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="pt-6 border-t border-white/[0.06] flex justify-between items-center text-sm text-liad-muted">
+        <span>Engenharia de Software • Projeto V</span>
+        <a href="/" class="text-liad-purple hover:text-white transition-colors duration-200 flex items-center gap-1 font-medium">
+          <span>←</span> Voltar para a Home
+        </a>
+      </footer>
+
+    </main>
   </div>
 
 </body>
