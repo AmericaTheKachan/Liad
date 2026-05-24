@@ -69,7 +69,7 @@ export async function uploadProductsCsv(accountId, file, onProgress) {
       fileSize: file.size,
       storagePath,
       downloadUrl,
-      status: "pending",
+      status: "processed",
       uploadedAt: serverTimestamp()
     });
   } catch (error) {
