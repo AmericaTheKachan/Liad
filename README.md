@@ -72,7 +72,10 @@ API de IA responsável por responder perguntas de clientes com base no catálogo
 
 | Rota | Descrição |
 |------|-----------|
-| `POST /chat` | Recebe mensagem e retorna resposta da IA |
+| `POST /chat` | Recebe `apiKey`, mensagem e retorna resposta da IA |
+| `GET /api-keys` | Retorna a API Key ativa da conta autenticada |
+| `POST /api-keys` | Gera ou rotaciona a API Key da conta autenticada |
+| `DELETE /api-keys` | Revoga a API Key ativa da conta autenticada |
 | `GET /health` | Verifica se o serviço está no ar |
 
 ### Tecnologias
@@ -119,7 +122,7 @@ POST http://localhost:3001/chat
 Content-Type: application/json
 
 {
-  "accountId": "00000000000000",
+  "apiKey": "sk-liad-sua-chave",
   "message": "Quais produtos vocês têm?",
   "history": []
 }

@@ -7,9 +7,10 @@
     return document.currentScript || document.querySelector('script[src*="widget.js"]');
   })();
 
-  const ACCOUNT_ID = (function () {
+  const API_KEY = (function () {
     if (!SCRIPT_EL) return "";
     return (
+      SCRIPT_EL.getAttribute("data-api-key") ||
       SCRIPT_EL.getAttribute("data-account-id") ||
       SCRIPT_EL.getAttribute("data-liad-account-id") ||
       SCRIPT_EL.getAttribute("data-liad-key") ||
@@ -1024,6 +1025,12 @@
       addMessage(text, "user");
       history.push({ role: "user", parts: [{ text }] });
 
+      if (!API_KEY) {
+        history.pop();
+        addMessage("API Key da LIAD nao configurada. Verifique o script de instalacao.", "bot");
+        return;
+      }
+
       const typingRow = showTyping();
 
       try {
@@ -1031,7 +1038,7 @@
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            accountId: ACCOUNT_ID,
+            apiKey: API_KEY,
             message: text,
             history: history.slice(0, -1),
           }),

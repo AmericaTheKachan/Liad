@@ -3,6 +3,7 @@ import fs from "fs";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { loadEnvFile } from "./utils/loadEnv";
+import apiKeysRouter from "./routes/api-keys";
 import chatRouter from "./routes/chat";
 import metricsRouter from "./routes/metrics";
 import { getAllAccountIds, getLatestCsvForAccount, invalidateCsvCache } from "./services/firebase-admin";
@@ -43,6 +44,7 @@ app.get("/widget.js", (_req: Request, res: Response) => {
   res.sendFile(widgetFile);
 });
 
+app.use("/", apiKeysRouter);
 app.use("/", chatRouter);
 app.use("/", metricsRouter);
 

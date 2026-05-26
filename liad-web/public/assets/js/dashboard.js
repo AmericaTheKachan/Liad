@@ -187,27 +187,27 @@ const SNIPPETS = {
   shopify: {
     label: "Shopify",
     instruction: "Cole este script no arquivo `theme.liquid` antes do fechamento de `</body>` ou em um App Embed block.",
-    code: (key) => [`{% comment %} Substitua pela sua API Key da LIAD se precisar {% endcomment %}`, `<script src="https://cdn.liad.ai/widget.js" data-liad-key="${key}" defer></script>`].join("\n")
+    code: (key, widgetUrl) => [`{% comment %} API Key publica da LIAD {% endcomment %}`, `<script src="${widgetUrl}" data-liad-key="${key}" defer></script>`].join("\n")
   },
   nuvemshop: {
     label: "Nuvemshop",
     instruction: "Cole o script no painel de scripts do tema, no rodape da loja.",
-    code: (key) => [`<!-- Substitua pela sua API Key da LIAD -->`, `<script src="https://cdn.liad.ai/widget.js" data-liad-key="${key}" defer></script>`].join("\n")
+    code: (key, widgetUrl) => [`<!-- API Key publica da LIAD -->`, `<script src="${widgetUrl}" data-liad-key="${key}" defer></script>`].join("\n")
   },
   woocommerce: {
     label: "WooCommerce",
     instruction: "Adicione no `functions.php` do tema ou em um plugin de header/footer.",
-    code: (key) => ["<?php", "// Substitua pela sua API Key da LIAD.", `echo '<script src=\"https://cdn.liad.ai/widget.js\" data-liad-key=\"${key}\" defer></script>';`, "?>"].join("\n")
+    code: (key, widgetUrl) => ["<?php", "// API Key publica da LIAD.", `echo '<script src=\"${widgetUrl}\" data-liad-key=\"${key}\" defer></script>';`, "?>"].join("\n")
   },
   vtex: {
     label: "VTEX",
     instruction: "Inclua o script no VTEX IO ou no CMS do storefront.",
-    code: (key) => ["{", '  "scripts": [', "    {", '      "src": "https://cdn.liad.ai/widget.js",', `      "data-liad-key": "${key}"`, "    }", "  ]", "}"].join("\n")
+    code: (key, widgetUrl) => ["{", '  "scripts": [', "    {", `      "src": "${widgetUrl}",`, `      "data-liad-key": "${key}"`, "    }", "  ]", "}"].join("\n")
   },
   universal: {
     label: "Universal (HTML)",
     instruction: "Cole este script antes do fechamento da tag `</body>`.",
-    code: (key) => [`<!-- Substitua o valor de data-liad-key pela sua API Key da LIAD -->`, `<script src="https://cdn.liad.ai/widget.js" data-liad-key="${key}" defer></script>`].join("\n")
+    code: (key, widgetUrl) => [`<!-- API Key publica da LIAD -->`, `<script src="${widgetUrl}" data-liad-key="${key}" defer></script>`].join("\n")
   }
 };
 
@@ -245,6 +245,8 @@ const PAYMENT_INVOICES = [
   { id: "2024-10", month: "Outubro de 2024", value: "R$ 197,00", status: "Pago" }
 ];
 
+const WIDGET_EXAMPLE_URL = "https://liad.com/widget.js";
+
 const state = {
   currentRoute: normalizeRoute(window.location.pathname),
   sidebarCollapsed: false,
@@ -262,10 +264,16 @@ const state = {
   accountId: "",
   account: null,
   apiKey: {
-    exists: true,
-    value: "sk-liad-4d91a98a71f2b44c9d3e6ab0",
+    exists: false,
+    value: "",
+    prefix: "",
+    last4: "",
+    createdAt: null,
+    lastUsedAt: null,
     revealed: false,
-    justGenerated: false
+    justGenerated: false,
+    loading: false,
+    error: null
   },
   settings: createBlankSettingsState()
 };
@@ -438,7 +446,11 @@ function formatMetricValue(metric) {
 }
 
 function maskApiKey() {
-  return `sk-liad-${"*".repeat(24)}`;
+  if (state.apiKey.prefix && state.apiKey.last4) {
+    return `${state.apiKey.prefix}${"*".repeat(24)}${state.apiKey.last4}`;
+  }
+
+  return `sk-liad-${"*".repeat(40)}`;
 }
 
 function getDisplayedApiKey() {
@@ -451,6 +463,29 @@ function getDisplayedApiKey() {
   }
 
   return maskApiKey();
+}
+
+function getAiBaseUrl() {
+  return (state.aiUrl || "http://localhost:3001").replace(/\/+$/, "");
+}
+
+function getWidgetUrl() {
+  return WIDGET_EXAMPLE_URL;
+}
+
+function normalizeApiKeyPayload(payload) {
+  return {
+    exists: Boolean(payload?.exists),
+    value: typeof payload?.value === "string" ? payload.value : typeof payload?.key === "string" ? payload.key : "",
+    prefix: typeof payload?.prefix === "string" ? payload.prefix : "",
+    last4: typeof payload?.last4 === "string" ? payload.last4 : "",
+    createdAt: typeof payload?.createdAt === "string" ? payload.createdAt : null,
+    lastUsedAt: typeof payload?.lastUsedAt === "string" ? payload.lastUsedAt : null,
+    revealed: Boolean(payload?.key),
+    justGenerated: Boolean(payload?.key),
+    loading: false,
+    error: null
+  };
 }
 
 function uniqueId(prefix) {
@@ -797,8 +832,7 @@ async function loadMetrics() {
   state.metricsError = null;
   const period = state.metricsFilter;
   try {
-    const base = state.aiUrl || "http://localhost:3001";
-    const res = await fetch(`${base}/metrics?accountId=${encodeURIComponent(state.accountId)}&period=${period}`);
+    const res = await fetch(`${getAiBaseUrl()}/metrics?accountId=${encodeURIComponent(state.accountId)}&period=${period}`);
     if (!res.ok) throw new Error("Falha ao carregar metricas.");
     const data = await res.json();
     state.metricsCache[period] = data;
@@ -1001,6 +1035,37 @@ function renderMetricsView() {
 }
 
 function renderApiKeyCard() {
+  if (state.apiKey.loading) {
+    return `
+      <article class="${cardClass("p-5 sm:p-6")}">
+        <div class="h-3 w-36 rounded-full bg-white/[0.06]"></div>
+        <div class="mt-5 h-12 rounded-2xl bg-white/[0.06]"></div>
+        <div class="mt-4 h-3 w-64 rounded-full bg-white/[0.06]"></div>
+      </article>
+    `;
+  }
+
+  if (state.apiKey.error) {
+    return `
+      <article class="${cardClass("grid min-h-[220px] place-items-center p-6 text-center")}">
+        <div>
+          <div class="mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[#ff8439]/10 text-[#ffb38c]">
+            ${getIconMarkup("alert")}
+          </div>
+          <h2 class="mt-5 text-xl font-semibold text-liad-text">Nao foi possivel carregar a API Key</h2>
+          <p class="mx-auto mt-2 max-w-md text-sm leading-7 text-liad-muted">${escapeHtml(state.apiKey.error)}</p>
+          <button
+            type="button"
+            data-api-action="reload"
+            class="mt-5 inline-flex min-h-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-5 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08]"
+          >
+            Tentar novamente
+          </button>
+        </div>
+      </article>
+    `;
+  }
+
   if (!state.apiKey.exists) {
     return `
       <article class="${cardClass("grid min-h-[240px] place-items-center p-6 text-center")}">
@@ -1047,7 +1112,7 @@ function renderApiKeyCard() {
           </div>
         </div>
 
-        ${state.apiKey.justGenerated ? `<div class="rounded-2xl border border-[#ffbd59]/30 bg-[#ffbd59]/10 px-4 py-3 text-sm leading-7 text-[#ffe4ae]"><strong>Salve essa chave agora.</strong> Ela nao sera exibida novamente apos a proxima geracao.</div>` : ""}
+        ${state.apiKey.justGenerated ? `<div class="rounded-2xl border border-[#ffbd59]/30 bg-[#ffbd59]/10 px-4 py-3 text-sm leading-7 text-[#ffe4ae]"><strong>Nova chave pronta.</strong> Atualize o snippet nas lojas que usam a chave anterior.</div>` : ""}
 
         <div class="flex flex-wrap gap-3">
           <button type="button" data-api-action="generate" class="inline-flex min-h-11 items-center justify-center rounded-2xl bg-gradient-to-r from-liad-violet to-liad-purple px-4 text-sm font-semibold text-black transition hover:-translate-y-0.5">Gerar nova chave</button>
@@ -1060,7 +1125,8 @@ function renderApiKeyCard() {
 
 function renderApiView() {
   const snippet = SNIPPETS[state.snippetPlatform];
-  const snippetKey = state.apiKey.exists ? state.apiKey.value : "sk-liad-sua-chave-aqui";
+  const snippetKey = state.apiKey.exists && state.apiKey.value ? state.apiKey.value : "sk-liad-sua-chave-aqui";
+  const widgetUrl = getWidgetUrl();
 
   return `
     ${renderPageHeader(
@@ -1099,7 +1165,7 @@ function renderApiView() {
             <strong class="text-sm font-semibold text-liad-text">${snippet.label}</strong>
             <button type="button" data-api-action="copy-snippet" class="inline-flex min-h-10 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08]">Copiar codigo</button>
           </div>
-          <pre class="overflow-x-auto px-4 py-5 text-sm leading-7 text-[#e3d5ff]"><code>${escapeHtml(snippet.code(snippetKey))}</code></pre>
+          <pre class="overflow-x-auto px-4 py-5 text-sm leading-7 text-[#e3d5ff]"><code>${escapeHtml(snippet.code(snippetKey, widgetUrl))}</code></pre>
         </div>
         <p class="mt-3 text-sm leading-6 text-liad-muted">${snippet.instruction}</p>
       </article>
@@ -2311,22 +2377,98 @@ function navigateTo(route, options = {}) {
   }, 160);
 }
 
-function generateApiKey() {
-  const seed = Math.random().toString(36).slice(2, 12) + Date.now().toString(36).slice(-8);
-  state.apiKey.exists = true;
-  state.apiKey.value = `sk-liad-${seed}`;
-  state.apiKey.revealed = true;
-  state.apiKey.justGenerated = true;
-  renderCurrentView();
-  setBanner("Nova API Key gerada. Salve a chave exibida antes de seguir.", "warning");
+async function requestApiKey(method) {
+  if (!state.currentUser?.getIdToken) {
+    throw new Error("Sessao expirada. Faca login novamente.");
+  }
+
+  const token = await state.currentUser.getIdToken();
+  const response = await fetch(`${getAiBaseUrl()}/api-keys`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      Accept: "application/json",
+      "Content-Type": "application/json"
+    }
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(payload.error || "Nao foi possivel atualizar a API Key.");
+  }
+
+  return payload;
 }
 
-function deleteApiKey() {
-  state.apiKey.exists = false;
-  state.apiKey.revealed = false;
-  state.apiKey.justGenerated = false;
+async function loadApiKey(options = {}) {
+  state.apiKey.loading = true;
+  state.apiKey.error = null;
+  if (!options.silent && state.currentRoute === "/api") {
+    renderCurrentView();
+  }
+
+  try {
+    const payload = await requestApiKey("GET");
+    state.apiKey = {
+      ...normalizeApiKeyPayload(payload),
+      revealed: false,
+      justGenerated: false
+    };
+  } catch (error) {
+    state.apiKey = {
+      ...state.apiKey,
+      loading: false,
+      error: error.message ?? "Nao foi possivel carregar a API Key."
+    };
+    if (!options.silent) {
+      setBanner(state.apiKey.error);
+    }
+  } finally {
+    state.apiKey.loading = false;
+    if (!options.silent && state.currentRoute === "/api") {
+      renderCurrentView();
+    }
+  }
+}
+
+async function generateApiKey() {
+  state.apiKey.loading = true;
   renderCurrentView();
-  setBanner("API Key excluida. A integracao da loja fica desativada ate uma nova geracao.", "warning");
+
+  try {
+    const payload = await requestApiKey("POST");
+    state.apiKey = normalizeApiKeyPayload(payload);
+    state.apiKey.revealed = true;
+    state.apiKey.justGenerated = true;
+    renderCurrentView();
+    setBanner("Nova API Key gerada e pronta para copiar.", "success");
+  } catch (error) {
+    state.apiKey.loading = false;
+    state.apiKey.error = error.message ?? "Nao foi possivel gerar a API Key.";
+    renderCurrentView();
+    setBanner(state.apiKey.error);
+  }
+}
+
+async function deleteApiKey() {
+  state.apiKey.loading = true;
+  renderCurrentView();
+
+  try {
+    const payload = await requestApiKey("DELETE");
+    state.apiKey = {
+      ...normalizeApiKeyPayload(payload),
+      revealed: false,
+      justGenerated: false
+    };
+    renderCurrentView();
+    setBanner("API Key excluida. A integracao da loja fica desativada ate uma nova geracao.", "warning");
+  } catch (error) {
+    state.apiKey.loading = false;
+    state.apiKey.error = error.message ?? "Nao foi possivel excluir a API Key.";
+    renderCurrentView();
+    setBanner(state.apiKey.error);
+  }
 }
 
 function toggleApiKeyVisibility() {
@@ -2362,7 +2504,17 @@ async function copyText(text, successMessage) {
 }
 
 function handleApiAction(action) {
+  if (action === "reload") {
+    loadApiKey();
+    return;
+  }
+
   if (action === "copy-key" && state.apiKey.exists) {
+    if (!state.apiKey.value) {
+      setBanner("Gere uma nova API Key para copiar o valor completo.");
+      return;
+    }
+
     copyText(state.apiKey.value, "API Key copiada com sucesso.");
     return;
   }
@@ -2374,8 +2526,8 @@ function handleApiAction(action) {
 
   if (action === "copy-snippet") {
     const snippet = SNIPPETS[state.snippetPlatform];
-    const key = state.apiKey.exists ? state.apiKey.value : "sk-liad-sua-chave-aqui";
-    copyText(snippet.code(key), `Snippet de ${snippet.label} copiado.`);
+    const key = state.apiKey.exists && state.apiKey.value ? state.apiKey.value : "sk-liad-sua-chave-aqui";
+    copyText(snippet.code(key, getWidgetUrl()), `Snippet de ${snippet.label} copiado.`);
     return;
   }
 
@@ -2702,6 +2854,7 @@ async function init() {
   state.accountId = context.accountId;
   state.account = context.account;
   state.settings = createSettingsStateFromAccount(context.account);
+  await loadApiKey({ silent: true });
   renderAccount(context.account);
   renderCurrentView();
   bindShellEvents();

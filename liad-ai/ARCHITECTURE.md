@@ -69,11 +69,11 @@ liad-ai/
 ```
 POST /chat
   │
-  ├─ [Validação] accountId + message obrigatórios
-  ├─ [Rate limit] 30 req/min por accountId (fallback: IP)
+  ├─ [Validação] apiKey + message obrigatórios
+  ├─ [Rate limit] 30 req/min por apiKey (fallback: IP)
   │
+  ├─ Firebase: getAccountByApiKey()        ──► resolve a conta pela chave ativa
   ├─ Firebase: getLatestCsvForAccount()  ──► cache 10min em memória
-  ├─ Firebase: getAccountData()          ──► cache 30min em memória
   │
   ├─ [Index check] CSV hash mudou? → buildIndex() em background (BM25)
   │     └─ Se índice ainda não existe: aguarda até 30s com polling de 500ms
@@ -111,7 +111,10 @@ POST /chat
 |---|---|---|---|
 | GET | `/health` | Nenhuma | Health check |
 | GET | `/widget.js` | Nenhuma | Serve o widget JS embeddável |
-| POST | `/chat` | Nenhuma (rate limit) | Chat com o assistente |
+| POST | `/chat` | API Key (`apiKey`) | Chat com o assistente |
+| GET | `/api-keys` | Firebase Bearer token | Retorna a chave ativa da conta |
+| POST | `/api-keys` | Firebase Bearer token | Gera ou rotaciona a chave ativa |
+| DELETE | `/api-keys` | Firebase Bearer token | Revoga a chave ativa |
 | GET | `/metrics` | Nenhuma ⚠️ | Analytics por período |
 | DELETE | `/admin/index-cache` | `X-Admin-Key` header | Limpa cache de índices |
 
@@ -159,7 +162,7 @@ IIFE (Immediately Invoked Function Expression) em vanilla JS sem dependências e
 
 ```html
 <script src="https://sua-api.com/widget.js"
-  data-account-id="abc123"
+  data-liad-key="sk-liad-sua-chave"
   data-api-url="https://sua-api.com"
   data-logo-url="https://sua-loja.com/logo.png">
 </script>
@@ -207,6 +210,12 @@ Funcionalidades:
 accounts/
   {accountId}/
     ├─ storeName: string
+    ├─ apiKeyValue: string
+    ├─ apiKeyHash: string
+    ├─ apiKeyPrefix: string
+    ├─ apiKeyLast4: string
+    ├─ apiKeyCreatedAt: Timestamp
+    ├─ apiKeyLastUsedAt: Timestamp | null
     ├─ ...outros campos da conta
     ├─ csvUploads/
     │    └─ {docId}/

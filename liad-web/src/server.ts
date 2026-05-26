@@ -53,6 +53,10 @@ app.get("/api", (req: Request, res: Response) => {
   sendPage(res, "dashboard.html");
 });
 
+app.get("/teste-api", (req: Request, res: Response) => {
+  sendPage(res, "teste-api.html");
+});
+
 app.get("/produtos", (req: Request, res: Response) => {
   sendPage(res, "dashboard.html");
 });

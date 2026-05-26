@@ -1,8 +1,8 @@
 import { Request, Response, Router } from "express";
 import rateLimit from "express-rate-limit";
-import { ChatMessage } from "../utils/gemini-client";
+import type { ChatMessage } from "../utils/gemini-client";
 import { parseCsv } from "../utils/csv-utils";
-import { getAccountData, getLatestCsvForAccount, logConversation } from "../services/firebase-admin";
+import { getAccountByApiKey, getLatestCsvForAccount, logConversation, touchApiKeyUsage } from "../services/firebase-admin";
 import {
   buildIndex,
   hasIndex,
@@ -20,12 +20,12 @@ const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
   keyGenerator: (req: Request) => {
-    const body = req.body as { accountId?: string };
+    const body = req.body as { accountId?: string; apiKey?: string };
     const ip =
       (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
       req.socket.remoteAddress ??
       "unknown";
-    return body?.accountId ?? ip;
+    return body?.apiKey ?? body?.accountId ?? ip;
   },
   handler: (_req: Request, res: Response) => {
     res.status(429).json({ error: "Muitas requisicoes. Aguarde um momento e tente novamente." });
@@ -35,14 +35,15 @@ const limiter = rateLimit({
 router.use(limiter);
 
 router.post("/chat", async (req: Request, res: Response) => {
-  const { accountId, message, history } = req.body as {
+  const { apiKey, message, history } = req.body as {
+    apiKey?: string;
     accountId?: string;
     message?: string;
     history?: ChatMessage[];
   };
 
-  if (!accountId || typeof accountId !== "string") {
-    res.status(400).json({ error: "accountId e obrigatorio." });
+  if (!apiKey || typeof apiKey !== "string") {
+    res.status(400).json({ error: "apiKey e obrigatoria." });
     return;
   }
 
@@ -67,15 +68,18 @@ router.post("/chat", async (req: Request, res: Response) => {
   ).slice(-6) as ChatMessage[];
 
   try {
-    const [rawCsv, account] = await Promise.all([
-      getLatestCsvForAccount(accountId),
-      getAccountData(accountId),
-    ]);
-
-    if (!account) {
-      res.status(404).json({ error: "Conta nao encontrada." });
+    const apiKeyAccount = await getAccountByApiKey(apiKey);
+    if (!apiKeyAccount) {
+      res.status(401).json({ error: "API Key invalida ou inativa." });
       return;
     }
+
+    const { accountId, account } = apiKeyAccount;
+    touchApiKeyUsage(accountId).catch(err => console.error("[touchApiKeyUsage]", err));
+
+    const [rawCsv] = await Promise.all([
+      getLatestCsvForAccount(accountId),
+    ]);
 
     const storeName: string = account.storeName ?? "Loja";
 
