@@ -1,6 +1,6 @@
 import { Request, Response, Router } from "express";
 import * as admin from "firebase-admin";
-import { getAdminApp } from "../services/firebase-admin";
+import { getAdminApp } from "../lib/firebase";
 
 const router: Router = Router();
 

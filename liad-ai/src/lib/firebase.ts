@@ -21,7 +21,7 @@ export function getAdminApp(): admin.app.App {
   return adminApp;
 }
 
-// CSV in-memory cache
+// ─── CSV cache ────────────────────────────────────────────────────────────────
 
 interface CsvCacheEntry {
   content: string;
@@ -29,9 +29,9 @@ interface CsvCacheEntry {
 }
 
 const csvMemoryCache = new Map<string, CsvCacheEntry>();
-const CSV_CACHE_TTL_MS = 10 * 60_000; // 10 minutes
+const CSV_CACHE_TTL_MS = 10 * 60_000;
 
-// Account in-memory cache
+// ─── Account cache ────────────────────────────────────────────────────────────
 
 interface AccountCacheEntry {
   data: admin.firestore.DocumentData | null;
@@ -39,7 +39,9 @@ interface AccountCacheEntry {
 }
 
 const accountMemoryCache = new Map<string, AccountCacheEntry>();
-const ACCOUNT_CACHE_TTL_MS = 30 * 60_000; // 30 minutes
+const ACCOUNT_CACHE_TTL_MS = 30 * 60_000;
+
+// ─── Public API ───────────────────────────────────────────────────────────────
 
 export function invalidateCsvCache(accountId: string): void {
   csvMemoryCache.delete(accountId);

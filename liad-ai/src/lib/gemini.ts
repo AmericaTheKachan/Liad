@@ -1,7 +1,5 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-// ─── Singleton ────────────────────────────────────────────────────────────────
-
 let _client: GoogleGenerativeAI | null = null;
 
 export function getGeminiClient(): GoogleGenerativeAI {
@@ -12,8 +10,6 @@ export function getGeminiClient(): GoogleGenerativeAI {
   }
   return _client;
 }
-
-// ─── Shared types ─────────────────────────────────────────────────────────────
 
 export interface ChatMessage {
   role: "user" | "model";

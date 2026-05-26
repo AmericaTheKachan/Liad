@@ -1,8 +1,8 @@
 import { Request, Response, Router } from "express";
 import rateLimit from "express-rate-limit";
-import { ChatMessage } from "../utils/gemini-client";
-import { parseCsv } from "../utils/csv-utils";
-import { getAccountData, getLatestCsvForAccount, logConversation } from "../services/firebase-admin";
+import type { ChatMessage } from "../lib/gemini";
+import { parseCsv } from "../lib/csv";
+import { getAccountData, getLatestCsvForAccount, logConversation } from "../lib/firebase";
 import {
   buildIndex,
   hasIndex,
@@ -10,8 +10,8 @@ import {
   getIndexHash,
   getIndexSize,
   csvHash,
-} from "../services/product-index";
-import { processChatRequest } from "../services/assistant-orchestrator";
+} from "../catalog/index";
+import { chatTurn } from "../pipeline";
 
 const router: Router = Router();
 
@@ -117,7 +117,7 @@ router.post("/chat", async (req: Request, res: Response) => {
     const catalogSize = getIndexSize(accountId);
 
     const start = Date.now();
-    const { reply, topProduct } = await processChatRequest(
+    const { reply, topProduct } = await chatTurn(
       accountId,
       storeName,
       message.trim(),
