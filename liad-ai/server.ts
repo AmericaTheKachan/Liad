@@ -46,16 +46,10 @@ app.get("/widget.js", (_req: Request, res: Response) => {
 app.use("/", chatRouter);
 app.use("/", metricsRouter);
 
-/**
- * Admin: cache management
- *
- * Requires X-Admin-Key header matching ADMIN_KEY env var.
- *   DELETE /admin/index-cache              — clears BM25+vector index for all accounts
- *   DELETE /admin/index-cache?accountId=x  — clears index for one account
- *
- * Also invalidates the CSV memory cache so the next request fetches fresh data
- * from Firebase and triggers an immediate index rebuild.
- */
+// Admin: cache management
+// DELETE /admin/index-cache              -- clears all accounts
+// DELETE /admin/index-cache?accountId=x -- clears one account
+// Also invalidates CSV cache so next request fetches fresh data from Firebase.
 app.delete("/admin/index-cache", async (req: Request, res: Response) => {
   const adminKey = process.env.ADMIN_KEY;
   if (!adminKey) {
@@ -70,7 +64,7 @@ app.delete("/admin/index-cache", async (req: Request, res: Response) => {
   const accountId = req.query["accountId"] as string | undefined;
   if (accountId) {
     await clearDiskIndex(accountId);
-    invalidateCsvCache(accountId); // force fresh CSV fetch + index rebuild on next request
+    invalidateCsvCache(accountId);
     console.log(`[admin] Cleared index cache for account ${accountId}`);
     res.json({ cleared: accountId });
   } else {
@@ -104,9 +98,10 @@ async function preloadIndexes(): Promise<void> {
       const products = parseCsv(rawCsv);
       if (products.length === 0) continue;
       await buildIndex(accountId, products, csvHash(rawCsv));
-      console.log(`[preload] Index built for account ${accountId} (${products.length} products)`);
     } catch (err) {
-      console.error(`[preload] Failed to build index for account ${accountId}:`, err);
+      console.error(`[preload] Failed for account ${accountId}:`, err);
     }
   }
+
+  console.log("[preload] Preloading complete.");
 }

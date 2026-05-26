@@ -53,9 +53,8 @@ export async function initProductsView(container, ctxAccountId, modalCallback) {
 async function loadUploads() {
   productsState.loading = true;
   render();
- 
   try {
-    productsState.uploads = await listProductsCsvUploads(accountId);
+    await refreshUploads();
     productsState.error = "";
   } catch (error) {
     productsState.error = error.message ?? "Nao foi possivel carregar os arquivos.";
@@ -64,6 +63,43 @@ async function loadUploads() {
     render();
     bindEvents();
   }
+}
+
+async function refreshUploads() {
+  const localUploads = productsState.uploads.filter((upload) => upload.localOnly);
+  const remoteUploads = await listProductsCsvUploads(accountId);
+  productsState.uploads = [...localUploads, ...remoteUploads];
+}
+
+function prependUploadRow(upload) {
+  productsState.uploads = [
+    upload,
+    ...productsState.uploads.filter((item) => item.id !== upload.id)
+  ];
+}
+
+function addLocalErrorUpload(file, message) {
+  prependUploadRow({
+    id: `local-error-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    fileName: file.name,
+    fileSize: file.size,
+    uploadedAt: new Date(),
+    status: "error",
+    errorMessage: message,
+    localOnly: true
+  });
+}
+
+function addLocalProcessedUpload(file, uploadResult) {
+  prependUploadRow({
+    id: uploadResult.docId,
+    fileName: file.name,
+    fileSize: file.size,
+    uploadedAt: new Date(),
+    status: "processed",
+    storagePath: uploadResult.storagePath,
+    downloadUrl: uploadResult.downloadUrl
+  });
 }
  
 // ------------------------------------------------------------------
@@ -92,14 +128,21 @@ async function handleFileSelected(file) {
   bindEvents();
  
   try {
-    await uploadProductsCsv(accountId, file, (pct) => {
+    const uploadResult = await uploadProductsCsv(accountId, file, (pct) => {
       productsState.uploadProgress = pct;
       updateProgressBar(pct);
     });
- 
-    productsState.uploads = await listProductsCsvUploads(accountId);
+
+    try {
+      await refreshUploads();
+    } catch (error) {
+      addLocalProcessedUpload(file, uploadResult);
+      setError(error.message ?? "Arquivo processado, mas nao foi possivel atualizar a lista.");
+    }
   } catch (error) {
-    setError(error.message ?? "Nao foi possivel enviar o arquivo.");
+    const message = error.message ?? "Nao foi possivel enviar o arquivo.";
+    addLocalErrorUpload(file, message);
+    setError(message);
   } finally {
     productsState.uploading = false;
     productsState.uploadProgress = 0;
@@ -120,7 +163,7 @@ async function handleDelete(docId, storagePath, fileName) {
     onConfirm: async () => {
       try {
         await deleteProductsCsvUpload(accountId, docId, storagePath);
-        productsState.uploads = await listProductsCsvUploads(accountId);
+        await refreshUploads();
       } catch (error) {
         setError(error.message ?? "Nao foi possivel excluir o arquivo.");
       }
@@ -325,20 +368,20 @@ function buildListContent() {
 }
  
 function buildUploadRow(upload) {
-  const status = upload.status ?? "pending";
+  const rawStatus = upload.status ?? "processed";
+  const status = rawStatus === "pending" ? "processed" : rawStatus;
   const statusBadge = {
-    pending: "bg-[#ffbd59]/12 text-[#ffe4ae]",
     processed: "bg-emerald-400/12 text-emerald-300",
     error: "bg-[#ff8439]/12 text-[#ffe2d0]"
   }[status] ?? "bg-white/10 text-liad-muted";
  
   const statusLabel = {
-    pending: "Aguardando IA",
     processed: "Processado",
     error: "Erro"
   }[status] ?? status;
  
   const fileIcon = getFileIcon(upload.fileName);
+  const statusTitle = upload.errorMessage ? ` title="${escHtml(upload.errorMessage)}"` : "";
  
   return `
     <tr class="border-b border-white/6 text-sm text-liad-text transition hover:bg-white/[0.03]">
@@ -353,35 +396,49 @@ function buildUploadRow(upload) {
       <td class="px-3 py-4 text-liad-muted">${formatFileSize(upload.fileSize)}</td>
       <td class="px-3 py-4 text-liad-muted">${formatUploadDate(upload.uploadedAt)}</td>
       <td class="px-3 py-4">
-        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadge}">${statusLabel}</span>
+        <span class="inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusBadge}"${statusTitle}>${statusLabel}</span>
       </td>
       <td class="px-3 py-4">
-        <div class="flex items-center gap-2">
-          ${upload.downloadUrl ? `
-            <a
-              href="${escHtml(upload.downloadUrl)}"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08]"
-            >
-              ${getIconMarkup("download")}
-              <span>Baixar</span>
-            </a>
-          ` : ""}
-          <button
-            type="button"
-            data-delete-upload
-            data-doc-id="${escHtml(upload.id)}"
-            data-storage-path="${escHtml(upload.storagePath ?? "")}"
-            data-file-name="${escHtml(upload.fileName)}"
-            class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl border border-[#ff8439]/20 bg-[#ff8439]/08 px-3 text-sm font-semibold text-[#ffb49e] transition hover:bg-[#ff8439]/15"
-          >
-            ${getIconMarkup("trash")}
-            <span>Remover</span>
-          </button>
-        </div>
+        ${buildUploadActions(upload)}
       </td>
     </tr>
+  `;
+}
+
+function buildUploadActions(upload) {
+  if (upload.localOnly) {
+    return `
+      <span class="inline-flex min-h-9 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.03] px-3 text-sm font-semibold text-liad-muted">
+        Nao enviado
+      </span>
+    `;
+  }
+
+  return `
+    <div class="flex items-center gap-2">
+      ${upload.downloadUrl ? `
+        <a
+          href="${escHtml(upload.downloadUrl)}"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl border border-white/10 bg-white/[0.04] px-3 text-sm font-semibold text-liad-text transition hover:bg-white/[0.08]"
+        >
+          ${getIconMarkup("download")}
+          <span>Baixar</span>
+        </a>
+      ` : ""}
+      <button
+        type="button"
+        data-delete-upload
+        data-doc-id="${escHtml(upload.id)}"
+        data-storage-path="${escHtml(upload.storagePath ?? "")}"
+        data-file-name="${escHtml(upload.fileName)}"
+        class="inline-flex min-h-9 items-center justify-center gap-1.5 rounded-2xl border border-[#ff8439]/20 bg-[#ff8439]/08 px-3 text-sm font-semibold text-[#ffb49e] transition hover:bg-[#ff8439]/15"
+      >
+        ${getIconMarkup("trash")}
+        <span>Remover</span>
+      </button>
+    </div>
   `;
 }
  
@@ -420,4 +477,3 @@ function bindEvents() {
     });
   });
 }
- 

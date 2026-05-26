@@ -14,14 +14,51 @@ export function getAdminApp(): admin.app.App {
 
     adminApp = admin.initializeApp({
       credential,
-      storageBucket: process.env.FIREBASE_STORAGE_BUCKET
+      storageBucket: process.env.FIREBASE_STORAGE_BUCKET,
     });
   }
 
   return adminApp;
 }
 
+// CSV in-memory cache
+
+interface CsvCacheEntry {
+  content: string;
+  fetchedAt: number;
+}
+
+const csvMemoryCache = new Map<string, CsvCacheEntry>();
+const CSV_CACHE_TTL_MS = 10 * 60_000; // 10 minutes
+
+// Account in-memory cache
+
+interface AccountCacheEntry {
+  data: admin.firestore.DocumentData | null;
+  fetchedAt: number;
+}
+
+const accountMemoryCache = new Map<string, AccountCacheEntry>();
+const ACCOUNT_CACHE_TTL_MS = 30 * 60_000; // 30 minutes
+
+export function invalidateCsvCache(accountId: string): void {
+  csvMemoryCache.delete(accountId);
+}
+
 export async function getLatestCsvForAccount(accountId: string): Promise<string | null> {
+  const cached = csvMemoryCache.get(accountId);
+  if (cached && Date.now() - cached.fetchedAt < CSV_CACHE_TTL_MS) {
+    return cached.content;
+  }
+
+  const content = await _fetchCsvFromFirebase(accountId);
+  if (content !== null) {
+    csvMemoryCache.set(accountId, { content, fetchedAt: Date.now() });
+  }
+  return content;
+}
+
+async function _fetchCsvFromFirebase(accountId: string): Promise<string | null> {
   const app = getAdminApp();
   const db = admin.firestore(app);
 
@@ -33,28 +70,56 @@ export async function getLatestCsvForAccount(accountId: string): Promise<string 
     .limit(1)
     .get();
 
-  if (snapshot.empty) {
-    return null;
-  }
+  if (snapshot.empty) return null;
 
-  const upload = snapshot.docs[0].data();
-  const storagePath: string = upload.storagePath;
-
-  if (!storagePath) {
-    return null;
-  }
+  const storagePath: string = snapshot.docs[0].data().storagePath;
+  if (!storagePath) return null;
 
   const bucket = admin.storage(app).bucket();
-  const file = bucket.file(storagePath);
-  const [contents] = await file.download();
-
+  const [contents] = await bucket.file(storagePath).download();
   return contents.toString("utf-8");
 }
 
+export async function getAllAccountIds(): Promise<string[]> {
+  const app = getAdminApp();
+  const db = admin.firestore(app);
+  const snapshot = await db.collection("accounts").get();
+  return snapshot.docs.map(doc => doc.id);
+}
+
 export async function getAccountData(accountId: string): Promise<admin.firestore.DocumentData | null> {
+  const cached = accountMemoryCache.get(accountId);
+  if (cached && Date.now() - cached.fetchedAt < ACCOUNT_CACHE_TTL_MS) {
+    return cached.data;
+  }
+
   const app = getAdminApp();
   const db = admin.firestore(app);
   const doc = await db.collection("accounts").doc(accountId).get();
+  const data = doc.exists ? doc.data() ?? null : null;
 
-  return doc.exists ? doc.data() ?? null : null;
+  accountMemoryCache.set(accountId, { data, fetchedAt: Date.now() });
+  return data;
+}
+
+export async function logConversation(
+  accountId: string,
+  data: {
+    messageCount: number;
+    topProduct: string | null;
+    responseTimeMs: number;
+  }
+): Promise<void> {
+  const app = getAdminApp();
+  const db = admin.firestore(app);
+  await db
+    .collection("accounts")
+    .doc(accountId)
+    .collection("conversations")
+    .add({
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      messageCount: data.messageCount,
+      topProduct: data.topProduct,
+      responseTimeMs: data.responseTimeMs,
+    });
 }
