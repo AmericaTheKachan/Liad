@@ -4,3 +4,4 @@ dist/
 service-account.json
 *.log
 .index-cache/
+.liad-cache/

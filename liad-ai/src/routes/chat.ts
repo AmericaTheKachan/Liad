@@ -1,8 +1,8 @@
 import { Request, Response, Router } from "express";
 import rateLimit from "express-rate-limit";
-import type { ChatMessage } from "../utils/gemini-client";
-import { parseCsv } from "../utils/csv-utils";
-import { getAccountByApiKey, getLatestCsvForAccount, logConversation, touchApiKeyUsage } from "../services/firebase-admin";
+import type { ChatMessage } from "../lib/gemini";
+import { parseCsv } from "../lib/csv";
+import { getAccountData, getLatestCsvForAccount, logConversation } from "../lib/firebase";
 import {
   buildIndex,
   hasIndex,
@@ -10,8 +10,8 @@ import {
   getIndexHash,
   getIndexSize,
   csvHash,
-} from "../services/product-index";
-import { processChatRequest } from "../services/assistant-orchestrator";
+} from "../catalog/index";
+import { chatTurn } from "../pipeline";
 
 const router: Router = Router();
 
@@ -56,14 +56,14 @@ router.post("/chat", async (req: Request, res: Response) => {
   const safeHistory = (
     Array.isArray(history)
       ? history.filter(
-          (msg) =>
-            msg &&
-            (msg.role === "user" || msg.role === "model") &&
-            Array.isArray(msg.parts) &&
-            msg.parts.length > 0 &&
-            typeof msg.parts[0].text === "string" &&
-            msg.parts[0].text.trim().length > 0
-        )
+        (msg) =>
+          msg &&
+          (msg.role === "user" || msg.role === "model") &&
+          Array.isArray(msg.parts) &&
+          msg.parts.length > 0 &&
+          typeof msg.parts[0].text === "string" &&
+          msg.parts[0].text.trim().length > 0
+      )
       : []
   ).slice(-6) as ChatMessage[];
 
@@ -121,7 +121,7 @@ router.post("/chat", async (req: Request, res: Response) => {
     const catalogSize = getIndexSize(accountId);
 
     const start = Date.now();
-    const { reply, topProduct } = await processChatRequest(
+    const { reply, topProduct } = await chatTurn(
       accountId,
       storeName,
       message.trim(),

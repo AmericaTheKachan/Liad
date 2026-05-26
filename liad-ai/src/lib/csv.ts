@@ -1,12 +1,13 @@
 import { parse } from "csv-parse/sync";
-import { Product } from "../services/schema-analysis";
 
-// --- CSV Parsing ---
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-/**
- * Heuristic: count delimiters in the first non-empty line and pick the most common one.
- * Handles the common Brazilian Excel pattern of ";" as the column separator.
- */
+export interface Product {
+  [key: string]: string | number | boolean | null | undefined;
+}
+
+// ─── CSV Parsing ──────────────────────────────────────────────────────────────
+
 function detectDelimiter(csv: string): string {
   const BOM = "﻿";
   const firstLine =
@@ -20,7 +21,6 @@ function detectDelimiter(csv: string): string {
 }
 
 export function parseCsv(csvContent: string): Product[] {
-  // Strip UTF-8 BOM that Excel adds when saving as CSV
   const BOM = "﻿";
   const content = csvContent.startsWith(BOM) ? csvContent.slice(1) : csvContent;
   const delimiter = detectDelimiter(content);
@@ -35,19 +35,19 @@ export function parseCsv(csvContent: string): Product[] {
     }) as Product[];
     if (rows.length > 0) {
       console.log(
-        `[csv-utils] Parsed ${rows.length} products (delimiter="${
+        `[csv] Parsed ${rows.length} products (delimiter="${
           delimiter === "\t" ? "\\t" : delimiter
         }")`
       );
     }
     return rows;
   } catch (err) {
-    console.warn("[csv-utils] CSV parse failed:", err);
+    console.warn("[csv] CSV parse failed:", err);
     return [];
   }
 }
 
-// --- CSV Formatting ---
+// ─── Prompt Formatting ────────────────────────────────────────────────────────
 
 export function productsToPromptCsv(products: Product[]): string {
   if (products.length === 0) return "No products found.";
@@ -56,8 +56,7 @@ export function productsToPromptCsv(products: Product[]): string {
   return [headers.join(","), ...rows].join("\n");
 }
 
-// --- Number Extraction ---
-// Handles values like "$59.90", "R$ 150,00", or plain numbers.
+// ─── Field Value Helpers ──────────────────────────────────────────────────────
 
 export function extractNumber(val: unknown): number | null {
   if (typeof val === "number") return val;
@@ -66,8 +65,6 @@ export function extractNumber(val: unknown): number | null {
   const num = parseFloat(clean);
   return isNaN(num) ? null : num;
 }
-
-// --- Product Name Extraction ---
 
 const NAME_FIELDS = [
   "name", "nome", "produto", "title", "titulo", "product_name", "item_name",

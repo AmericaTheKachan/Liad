@@ -2,13 +2,12 @@ import path from "path";
 import fs from "fs";
 import express, { Request, Response } from "express";
 import cors from "cors";
-import { loadEnvFile } from "./utils/loadEnv";
-import apiKeysRouter from "./routes/api-keys";
+import { loadEnvFile } from "./lib/env";
 import chatRouter from "./routes/chat";
 import metricsRouter from "./routes/metrics";
-import { getAllAccountIds, getLatestCsvForAccount, invalidateCsvCache } from "./services/firebase-admin";
-import { buildIndex, csvHash, clearDiskIndex, clearAllDiskIndexes } from "./services/product-index";
-import { parseCsv } from "./utils/csv-utils";
+import { getAllAccountIds, getLatestCsvForAccount, invalidateCsvCache } from "./lib/firebase";
+import { buildIndex, csvHash, clearIndex, clearAllIndexes } from "./catalog/index";
+import { parseCsv } from "./lib/csv";
 
 loadEnvFile(path.join(process.cwd(), ".env"));
 
@@ -71,12 +70,12 @@ app.delete("/admin/index-cache", async (req: Request, res: Response) => {
 
   const accountId = req.query["accountId"] as string | undefined;
   if (accountId) {
-    await clearDiskIndex(accountId);
-    invalidateCsvCache(accountId); // force fresh CSV fetch + index rebuild on next request
+    clearIndex(accountId);
+    invalidateCsvCache(accountId);
     console.log(`[admin] Cleared index cache for account ${accountId}`);
     res.json({ cleared: accountId });
   } else {
-    await clearAllDiskIndexes();
+    await clearAllIndexes();
     console.log("[admin] Cleared all index caches.");
     res.json({ cleared: "all" });
   }
