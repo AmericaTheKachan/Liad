@@ -6,7 +6,7 @@ import {
   getAuthenticatedAccount,
   verifyFirebaseToken,
   type AuthenticatedAccount,
-} from "../services/firebase-admin";
+} from "../lib/firebase";
 
 const router: Router = Router();
 
