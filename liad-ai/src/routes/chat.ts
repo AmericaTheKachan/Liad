@@ -2,7 +2,12 @@ import { Request, Response, Router } from "express";
 import rateLimit from "express-rate-limit";
 import type { ChatMessage } from "../lib/gemini";
 import { parseCsv } from "../lib/csv";
-import { getAccountData, getLatestCsvForAccount, logConversation } from "../lib/firebase";
+import {
+  getAccountByApiKey,
+  getLatestCsvForAccount,
+  logConversation,
+  touchApiKeyUsage,
+} from "../lib/firebase";
 import {
   buildIndex,
   hasIndex,

@@ -3,6 +3,7 @@ import fs from "fs";
 import express, { Request, Response } from "express";
 import cors from "cors";
 import { loadEnvFile } from "./lib/env";
+import apiKeysRouter from "./routes/api-keys";
 import chatRouter from "./routes/chat";
 import metricsRouter from "./routes/metrics";
 import { getAllAccountIds, getLatestCsvForAccount, invalidateCsvCache } from "./lib/firebase";
