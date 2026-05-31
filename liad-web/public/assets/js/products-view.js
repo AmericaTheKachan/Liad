@@ -100,6 +100,9 @@ async function handleFileSelected(file) {
     productsState.uploads = await listProductsCsvUploads(accountId);
   } catch (error) {
     setError(error.message ?? "Nao foi possivel enviar o arquivo.");
+    try {
+      productsState.uploads = await listProductsCsvUploads(accountId);
+    } catch (_) {}
   } finally {
     productsState.uploading = false;
     productsState.uploadProgress = 0;
@@ -165,7 +168,21 @@ function getFileIcon(fileName) {
   if (ext === "json") return "json";
   return "csv"; // csv, tsv e fallback
 }
- 
+
+function normalizeUploadStatus(status) {
+  const value = String(status ?? "pending").trim().toLowerCase();
+
+  if (["processed", "processado", "completed", "complete", "success", "done"].includes(value)) {
+    return "processed";
+  }
+
+  if (["error", "erro", "failed", "failure", "falhou"].includes(value)) {
+    return "error";
+  }
+
+  return "pending";
+}
+
 function getIconMarkup(icon) {
   const base = 'class="h-5 w-5 stroke-current" fill="none" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"';
   const icons = {
@@ -325,11 +342,11 @@ function buildListContent() {
 }
  
 function buildUploadRow(upload) {
-  const status = upload.status ?? "pending";
+  const status = normalizeUploadStatus(upload.status);
   const statusBadge = {
     pending: "bg-[#ffbd59]/12 text-[#ffe4ae]",
     processed: "bg-emerald-400/12 text-emerald-300",
-    error: "bg-[#ff8439]/12 text-[#ffe2d0]"
+    error: "bg-red-500/15 text-red-300"
   }[status] ?? "bg-white/10 text-liad-muted";
  
   const statusLabel = {
@@ -420,4 +437,3 @@ function bindEvents() {
     });
   });
 }
- 

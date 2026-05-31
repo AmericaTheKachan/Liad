@@ -36,30 +36,6 @@ export async function uploadProductsCsv(accountId, file, onProgress) {
   const { db, storage } = await getFirebaseServices();
   const storagePath = buildCsvStoragePath(accountId, file);
   const storageRef = ref(storage, storagePath);
-
-  const downloadUrl = await new Promise((resolve, reject) => {
-    const task = uploadBytesResumable(storageRef, file, {
-      contentType: "text/csv",
-      cacheControl: "private,max-age=0"
-    });
-
-    task.on(
-      "state_changed",
-      (snapshot) => {
-        const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-        onProgress?.(pct);
-      },
-      reject,
-      async () => {
-        try {
-          resolve(await getDownloadURL(task.snapshot.ref));
-        } catch (error) {
-          reject(error);
-        }
-      }
-    );
-  });
-
   const docId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const docRef = doc(db, "accounts", accountId, "csvUploads", docId);
 
@@ -68,15 +44,10 @@ export async function uploadProductsCsv(accountId, file, onProgress) {
       fileName: file.name,
       fileSize: file.size,
       storagePath,
-      downloadUrl,
       status: "pending",
       uploadedAt: serverTimestamp()
     });
   } catch (error) {
-    try {
-      await deleteObject(storageRef);
-    } catch (_) {}
-
     if (isPermissionDeniedError(error)) {
       throw new Error(
         "O Firestore bloqueou o registro do arquivo. Publique as regras da subcoleção csvUploads."
@@ -86,7 +57,62 @@ export async function uploadProductsCsv(accountId, file, onProgress) {
     throw error;
   }
 
-  return { docId, storagePath, downloadUrl };
+  try {
+    const downloadUrl = await new Promise((resolve, reject) => {
+      const task = uploadBytesResumable(storageRef, file, {
+        contentType: "text/csv",
+        cacheControl: "private,max-age=0"
+      });
+
+      task.on(
+        "state_changed",
+        (snapshot) => {
+          const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          onProgress?.(pct);
+        },
+        reject,
+        async () => {
+          try {
+            resolve(await getDownloadURL(task.snapshot.ref));
+          } catch (error) {
+            reject(error);
+          }
+        }
+      );
+    });
+
+    await setDoc(
+      docRef,
+      {
+        downloadUrl,
+        status: "processed",
+        processedAt: serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    return { docId, storagePath, downloadUrl };
+  } catch (error) {
+    try {
+      await setDoc(
+        docRef,
+        {
+          status: "error",
+          errorMessage: error?.message ?? "Nao foi possivel enviar o arquivo.",
+          failedAt: serverTimestamp()
+        },
+        { merge: true }
+      );
+    } catch (statusError) {
+      console.error("Falha ao marcar upload com erro.", statusError);
+    }
+
+    try {
+      await deleteObject(storageRef);
+    } catch (_) {}
+
+    throw error;
+  }
 }
 
 export async function listProductsCsvUploads(accountId) {
