@@ -45,7 +45,7 @@ Given the recent conversation and the customer's latest message, output a single
 - "specificProduct": the exact product the customer is looking for, as a clean "Type Brand Model" string.
   Set ONLY when the customer names a specific brand AND a model name/number (e.g. "Mouse Logitech G403", "Tênis Nike Air Force 1", "iPhone 15 Pro Max", "Smart TV Samsung 55 QLED").
   Set to null for: brand-only queries ("algo da Nike"), category-only ("mouse gamer"), use-case queries ("tênis para academia"), or when there is no identifiable model.
-- "isShoppingIntent": true if the customer is looking for a product; false for pure greetings, thanks, or chitchat.
+- "isShoppingIntent": true if the customer is looking for a product OR asking about products already in the conversation (comparisons, differences, "why is X better", "which one should I choose", "what's the difference between them"). Set false ONLY for pure greetings, thanks, or chitchat unrelated to products.
 - "needsClarification": true when the customer has clear shopping intent but hasn't named a product type. Triggered by occasion/recipient without category (e.g. "present for my mom", "something for the house"). Do NOT set true if product type is clear (e.g. "headset", "tênis", "caixa de som").
 - "filters": object with ONLY the fields explicitly stated by the customer:
   - "minPrice" (number, BRL)
@@ -93,7 +93,22 @@ User: "Oi tudo bem?"
 {"searchQuery":"","specificProduct":null,"isShoppingIntent":false,"needsClarification":false,"filters":{}}
 
 User: "quero tenis masculino ate R$200"
-{"searchQuery":"tenis masculino","specificProduct":null,"isShoppingIntent":true,"needsClarification":false,"filters":{"gender":"masculino","maxPrice":200}}`;
+{"searchQuery":"tenis masculino","specificProduct":null,"isShoppingIntent":true,"needsClarification":false,"filters":{"gender":"masculino","maxPrice":200}}
+
+History: assistant recommended "Tênis Adidas Ultraboost" and "Tênis Nike Revolution"
+User: "qual a diferença entre os dois?"
+{"searchQuery":"tênis adidas ultraboost nike revolution","specificProduct":null,"isShoppingIntent":true,"needsClarification":false,"filters":{}}
+
+History: assistant recommended "Fone JBL Tune 510" and "Fone Sony WH-1000XM5"
+User: "por que o sony é melhor?"
+{"searchQuery":"fone sony wh-1000xm5 jbl tune 510","specificProduct":null,"isShoppingIntent":true,"needsClarification":false,"filters":{}}
+
+History: assistant recommended "Camiseta Puma Dry-fit" and "Camiseta Nike Dri-FIT"
+User: "qual dos dois você recomenda?"
+{"searchQuery":"camiseta puma dry-fit nike dri-fit","specificProduct":null,"isShoppingIntent":true,"needsClarification":false,"filters":{}}
+
+User: "qual é melhor?"
+{"searchQuery":"","specificProduct":null,"isShoppingIntent":true,"needsClarification":false,"filters":{}}`;
 
 // ─── Regex-based fallback ─────────────────────────────────────────────────────
 
