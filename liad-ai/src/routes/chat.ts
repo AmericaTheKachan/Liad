@@ -1,87 +1,59 @@
 import { Request, Response, Router } from "express";
 import rateLimit from "express-rate-limit";
-import { askGemini, ChatMessage } from "../services/gemini";
-import { getAccountData, getLatestCsvForAccount } from "../services/firebase-admin";
+import type { ChatMessage } from "../lib/gemini";
+import { parseCsv } from "../lib/csv";
+import {
+  getAccountByApiKey,
+  getLatestCsvForAccount,
+  logConversation,
+  touchApiKeyUsage,
+} from "../lib/firebase";
 import {
   buildIndex,
-  searchProducts,
   hasIndex,
+  isIndexBuilding,
   getIndexHash,
   getIndexSize,
   csvHash,
-  Product,
-} from "../services/semantic-search";
-import fs from "fs";
-import path from "path";
-import { parse } from "csv-parse/sync";
+} from "../catalog/index";
+import { chatTurn } from "../pipeline";
 
-const router = Router();
+const router: Router = Router();
 
-// ─── Rate limiting ────────────────────────────────────────────────────────────
-// 30 requests / minute per accountId (falls back to IP)
-
+// Rate limiter: 30 requests / minute per accountId (falls back to IP)
 const limiter = rateLimit({
   windowMs: 60 * 1000,
   max: 30,
-  keyGenerator: (req) => {
-    const body = req.body as { accountId?: string };
-    const ip = (req.headers["x-forwarded-for"] as string)?.split(",")[0] ?? req.socket.remoteAddress ?? "unknown";
-    return body?.accountId ?? ip;
+  keyGenerator: (req: Request) => {
+    const body = req.body as { accountId?: string; apiKey?: string };
+    const ip =
+      (req.headers["x-forwarded-for"] as string)?.split(",")[0] ??
+      req.socket.remoteAddress ??
+      "unknown";
+    return body?.apiKey ?? body?.accountId ?? ip;
   },
-  handler: (_req, res) => {
-    res.status(429).json({ error: "Muitas requisições. Aguarde um momento e tente novamente." });
+  handler: (_req: Request, res: Response) => {
+    res.status(429).json({ error: "Muitas requisicoes. Aguarde um momento e tente novamente." });
   },
 });
 
 router.use(limiter);
 
-// ─── CSV helpers ──────────────────────────────────────────────────────────────
-
-function parseCsv(csvContent: string): Product[] {
-  try {
-    return parse(csvContent, {
-      columns: true,
-      skip_empty_lines: true,
-      trim: true,
-    }) as Product[];
-  } catch {
-    return [];
-  }
-}
-
-function productsToPromptCsv(products: Product[]): string {
-  if (products.length === 0) return "No products found.";
-  const headers = Object.keys(products[0]);
-  const rows = products.map((p) => headers.map((h) => p[h] ?? "").join(","));
-  return [headers.join(","), ...rows].join("\n");
-}
-
-// ─── Prompt builder ───────────────────────────────────────────────────────────
-
-function buildSystemPrompt(storeName: string, csvContent: string): string {
-  const promptPath = path.join(__dirname, "system-prompt.md");
-  let template = fs.readFileSync(promptPath, "utf-8");
-  template = template.replace("{storeName}", storeName);
-  template = template.replace("{csvContent}", csvContent);
-  return template;
-}
-
-// ─── Route ────────────────────────────────────────────────────────────────────
-
 router.post("/chat", async (req: Request, res: Response) => {
-  const { accountId, message, history } = req.body as {
+  const { apiKey, message, history } = req.body as {
+    apiKey?: string;
     accountId?: string;
     message?: string;
     history?: ChatMessage[];
   };
 
-  if (!accountId || typeof accountId !== "string") {
-    res.status(400).json({ error: "accountId é obrigatório." });
+  if (!apiKey || typeof apiKey !== "string") {
+    res.status(400).json({ error: "apiKey e obrigatoria." });
     return;
   }
 
   if (!message || typeof message !== "string" || message.trim().length === 0) {
-    res.status(400).json({ error: "message é obrigatório." });
+    res.status(400).json({ error: "message e obrigatorio." });
     return;
   }
 
@@ -89,67 +61,91 @@ router.post("/chat", async (req: Request, res: Response) => {
   const safeHistory = (
     Array.isArray(history)
       ? history.filter(
-          (msg) =>
-            msg &&
-            (msg.role === "user" || msg.role === "model") &&
-            Array.isArray(msg.parts) &&
-            msg.parts.length > 0 &&
-            typeof msg.parts[0].text === "string" &&
-            msg.parts[0].text.trim().length > 0
-        )
+        (msg) =>
+          msg &&
+          (msg.role === "user" || msg.role === "model") &&
+          Array.isArray(msg.parts) &&
+          msg.parts.length > 0 &&
+          typeof msg.parts[0].text === "string" &&
+          msg.parts[0].text.trim().length > 0
+      )
       : []
   ).slice(-6) as ChatMessage[];
 
   try {
-    const [rawCsv, account] = await Promise.all([
-      getLatestCsvForAccount(accountId),
-      getAccountData(accountId),
-    ]);
-
-    if (!account) {
-      res.status(404).json({ error: "Conta não encontrada." });
+    const apiKeyAccount = await getAccountByApiKey(apiKey);
+    if (!apiKeyAccount) {
+      res.status(401).json({ error: "API Key invalida ou inativa." });
       return;
     }
 
+    const { accountId, account } = apiKeyAccount;
+    touchApiKeyUsage(accountId).catch(err => console.error("[touchApiKeyUsage]", err));
+
+    const [rawCsv] = await Promise.all([
+      getLatestCsvForAccount(accountId),
+    ]);
+
     const storeName: string = account.storeName ?? "Loja";
 
-    // ── Build/refresh index with hash-based invalidation ──────────────────
+    // Build / refresh index in the background when CSV changes
     if (rawCsv) {
       const currentHash = csvHash(rawCsv);
       const needsRebuild = !hasIndex(accountId) || getIndexHash(accountId) !== currentHash;
 
-      if (needsRebuild) {
+      if (needsRebuild && !isIndexBuilding(accountId)) {
         const products = parseCsv(rawCsv);
         if (products.length > 0) {
-          await buildIndex(accountId, products, currentHash);
+          buildIndex(accountId, products, currentHash).catch(err =>
+            console.error("[buildIndex background]", err)
+          );
+        } else {
+          console.warn(`[chat] parseCsv returned 0 products for account ${accountId}. Check CSV format.`);
         }
       }
+
+      // Wait up to 30s for the first build — widget shows typing indicator during this
+      if (!hasIndex(accountId)) {
+        const deadline = Date.now() + 30_000;
+        while (!hasIndex(accountId) && Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 500));
+        }
+      }
+
+      if (!hasIndex(accountId)) {
+        res.json({
+          reply: "Ainda estou carregando o catalogo de produtos. Por favor, repita sua pergunta em alguns instantes.",
+          loading: true,
+        });
+        return;
+      }
+    } else {
+      console.warn(`[chat] No CSV found for account ${accountId}.`);
     }
 
-    // ── Dynamic topK: small catalogs get everything, large ones get top 8 ─
     const catalogSize = getIndexSize(accountId);
-    const topK = catalogSize < 30 ? catalogSize : 8;
 
-    // ── Semantic search — enrich query with last user turn for context ─────
-    const lastUserMsg = safeHistory
-      .filter((m) => m.role === "user")
-      .slice(-1)[0]?.parts[0]?.text ?? "";
+    const start = Date.now();
+    const { reply, topProduct } = await chatTurn(
+      accountId,
+      storeName,
+      message.trim(),
+      safeHistory,
+      catalogSize,
+    );
+    const responseTimeMs = Date.now() - start;
 
-    const searchQuery = lastUserMsg
-      ? `${lastUserMsg} ${message.trim()}`
-      : message.trim();
-
-    const relevantProducts = await searchProducts(accountId, searchQuery, topK);
-    const filteredCsv = productsToPromptCsv(relevantProducts);
-
-    // ── Call Gemini with filtered catalog ─────────────────────────────────
-    const systemPrompt = buildSystemPrompt(storeName, filteredCsv);
-    const reply = await askGemini(systemPrompt, safeHistory, message.trim());
+    // Log asynchronously — do not block the response
+    logConversation(accountId, {
+      messageCount: safeHistory.length + 1,
+      topProduct,
+      responseTimeMs,
+    }).catch(err => console.error("[logConversation]", err));
 
     res.json({ reply });
   } catch (error) {
     const msg = error instanceof Error ? error.message : "Erro interno.";
-    console.error("[/api/chat]", error);
+    console.error("[/chat]", error);
     res.status(500).json({ error: msg });
   }
 });

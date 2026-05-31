@@ -53,6 +53,10 @@ app.get("/api", (req: Request, res: Response) => {
   sendPage(res, "dashboard.html");
 });
 
+app.get("/teste-api", (req: Request, res: Response) => {
+  sendPage(res, "teste-api.html");
+});
+
 app.get("/produtos", (req: Request, res: Response) => {
   sendPage(res, "dashboard.html");
 });
@@ -91,7 +95,8 @@ app.get("/api/firebase-config", (req: Request, res: Response) => {
   res.json({
     configured: missingKeys.length === 0,
     missingKeys,
-    config
+    config,
+    aiUrl: process.env.LIAD_AI_URL ?? "http://localhost:3001"
   });
 });
 

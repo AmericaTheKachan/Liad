@@ -1,38 +1,92 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
-<head>
-  <meta charset="UTF-8">
-  <title>Termos de Uso - LIAD</title>
-  <link rel="stylesheet" href="/assets/css/global.css">
-  <script src="https://cdn.tailwindcss.com"></script>
-</head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Termos de Uso - LIAD</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="/assets/css/global.css" />
+    <link rel="stylesheet" href="/assets/css/content-pages.css" />
+    <script src="/assets/js/tailwind-config.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+  </head>
 
-<body class="bg-liad-bg text-liad-text font-body">
+  <body class="content-page-shell bg-liad-bg font-body text-liad-text antialiased selection:bg-liad-purple/30">
+    <header class="content-page-header fixed inset-x-0 top-0 z-50 border-b border-white/5 bg-[rgba(19,19,21,0.92)]">
+      <div class="mx-auto flex max-w-[1280px] items-center justify-between px-5 py-4 sm:px-8 lg:px-20">
+        <a href="/" class="flex items-center gap-2.5 group">
+          <img src="/assets/images/logo.png" alt="LIAD" class="h-12 w-auto" style="filter: brightness(0) invert(1);" />
+          <span class="font-display text-xl font-bold tracking-[-0.06em] text-transparent bg-gradient-to-r from-liad-purple to-liad-blue bg-clip-text">LIAD</span>
+        </a>
 
-  <div class="max-w-4xl mx-auto p-10">
-    <h1 class="text-4xl font-bold mb-6">Termos de Uso</h1>
+        <div class="hidden items-center gap-10 md:flex">
+          <a href="/#recursos" class="text-sm font-medium text-slate-400 transition-colors duration-200 hover:text-liad-text">Recursos</a>
+          <a href="/#integracoes" class="text-sm font-medium text-slate-400 transition-colors duration-200 hover:text-liad-text">Pre&ccedil;os</a>
+          <a href="/login" class="text-sm font-medium text-slate-400 transition-colors duration-200 hover:text-liad-text">Login</a>
+          <a href="/cadastro" class="rounded-xl bg-gradient-to-r from-liad-violet to-liad-purple px-6 py-2.5 text-sm font-semibold text-black transition hover:-translate-y-0.5 hover:shadow-glow">Come&ccedil;ar Agora</a>
+        </div>
 
-    <p class="text-liad-muted mb-4">
-      Ao utilizar a plataforma LIAD, você concorda com os termos descritos abaixo.
-    </p>
+        <a href="/cadastro" class="rounded-xl bg-gradient-to-r from-liad-violet to-liad-purple px-4 py-2 text-sm font-semibold text-black transition hover:-translate-y-0.5 md:hidden">Come&ccedil;ar</a>
+      </div>
+    </header>
 
-    <h2 class="text-2xl mt-8 mb-2">Uso da plataforma</h2>
-    <p class="text-liad-muted">
-      A LIAD fornece ferramentas de inteligência artificial para e-commerce.
-    </p>
+    <main id="top" class="content-page-main relative z-10 mx-auto max-w-[1280px] px-5 pb-24 pt-32 sm:px-8 lg:px-20">
+      <section class="border-b border-white/10 pb-10">
+        <a href="/" class="content-page-back">&larr; Voltar para a tela inicial</a>
+        <div class="mt-8 max-w-3xl">
+          <span class="content-page-chip">Legal</span>
+          <h1 class="content-page-title mt-5 text-5xl font-extrabold leading-[0.95] text-liad-text sm:text-6xl lg:text-[72px]">Termos de Uso</h1>
+          <p class="content-page-lead mt-6 max-w-2xl text-lg sm:text-xl">
+            Ao utilizar a plataforma LIAD, voc&ecirc; concorda com as condi&ccedil;&otilde;es descritas abaixo.
+          </p>
+        </div>
+      </section>
 
-    <h2 class="text-2xl mt-8 mb-2">Responsabilidades</h2>
-    <p class="text-liad-muted">
-      O usuário é responsável pelas informações fornecidas e pelo uso adequado da plataforma.
-    </p>
+      <div class="mt-10 max-w-4xl">
+        <article class="content-page-article">
+          <section id="uso" class="p-6 sm:p-8">
+            <h2>Uso da plataforma</h2>
+            <p class="mt-4">
+              A LIAD fornece ferramentas de intelig&ecirc;ncia artificial para e-commerce, incluindo recursos para atendimento, recomenda&ccedil;&otilde;es e suporte &agrave; opera&ccedil;&atilde;o comercial.
+            </p>
+          </section>
 
-    <h2 class="text-2xl mt-8 mb-2">Limitações</h2>
-    <p class="text-liad-muted">
-      Não garantimos resultados específicos de vendas ou desempenho.
-    </p>
+          <section id="responsabilidades" class="p-6 sm:p-8">
+            <h2>Responsabilidades</h2>
+            <p class="mt-4">
+              O usu&aacute;rio &eacute; respons&aacute;vel pelas informa&ccedil;&otilde;es fornecidas, pela configura&ccedil;&atilde;o da conta e pelo uso adequado da plataforma.
+            </p>
+          </section>
 
-    <a href="/" class="text-liad-purple mt-10 inline-block">← Voltar</a>
-  </div>
+          <section id="limitacoes" class="p-6 sm:p-8">
+            <h2>Limita&ccedil;&otilde;es</h2>
+            <p class="mt-4">
+              A LIAD apoia a opera&ccedil;&atilde;o de vendas, mas n&atilde;o garante resultados espec&iacute;ficos de convers&atilde;o, receita ou desempenho comercial.
+            </p>
+          </section>
+        </article>
+      </div>
+    </main>
 
-</body>
+    <footer class="relative z-10 border-t border-white/5 bg-liad-bg">
+      <div class="mx-auto flex max-w-[1280px] flex-col gap-6 px-5 py-12 text-xs text-slate-500 sm:px-8 lg:flex-row lg:items-center lg:justify-between lg:px-20">
+        <a href="/" class="flex items-center gap-2">
+          <img src="/assets/images/logo.png" alt="LIAD" class="h-5 w-auto" style="filter: brightness(0) invert(1) opacity(0.7);" />
+          <span class="font-display font-bold tracking-[-0.05em] text-slate-400">LIAD</span>
+          <span class="text-slate-600">&middot; &copy; 2026 LIAD AI. Intelig&ecirc;ncia Artificial para E-commerce.</span>
+        </a>
+        <div class="flex flex-wrap items-center gap-8">
+          <a href="/termos" class="text-liad-purple">Termos</a>
+          <a href="/privacidade" class="transition hover:text-liad-text">Privacidade</a>
+          <a href="/contato" class="transition hover:text-liad-text">Contato</a>
+          <a href="/documentacao" class="transition hover:text-liad-text">Documenta&ccedil;&atilde;o</a>
+        </div>
+      </div>
+    </footer>
+  </body>
 </html>
